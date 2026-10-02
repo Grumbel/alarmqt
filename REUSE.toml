@@ -7,6 +7,7 @@ path = [
   "flake.nix",
   "resources.qrc",
   "share/**",
+  "man/**",
   "icons/**",
   "README.md",
   "AGENTS.md",

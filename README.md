@@ -64,6 +64,10 @@ Installed files (via CMake / Nix):
 
 The app sets `QGuiApplication::setDesktopFileName("alarmqt")` so the tray and window match the desktop entry (icon, notifications, single-window hints).
 
+## Manual
+
+After install: `man alarmqt`
+
 ## Version
 
 `VERSION` is the only source of truth. Development trees use a `-dev` suffix

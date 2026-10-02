@@ -1,0 +1,133 @@
+.\" SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH ALARMQT 1 "October 2026" "alarmqt" "User Commands"
+.SH NAME
+alarmqt \- keyboard-friendly system-tray alarms and reminders
+.SH SYNOPSIS
+.B alarmqt
+[\fIOPTIONS\fR]
+[\fIALARM\fR...]
+.SH DESCRIPTION
+.B alarmqt
+is a small Qt6 system-tray alarm application for Linux.
+It accepts relative times (for example
+.Qq in 5m )
+and absolute times (for example
+.Qq at 15:10 ),
+optionally with a short human-readable note.
+Alarms keep notifying (dialog, tray message, and sound) until they are
+acknowledged or snoozed.
+.PP
+Only one instance runs at a time.
+A second invocation forwards the command line to the running process
+(raise the window, add an alarm, quit, and so on).
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help text and exit.
+.TP
+.BR \-v ", " \-\-version
+Print the full version string and exit.
+.TP
+.BR \-q ", " \-\-quit
+Quit the running instance.
+If none is running, exit successfully without starting the GUI.
+.TP
+.BR \-l ", " \-\-list
+List alarms.
+If no instance is running, print the list and exit without starting the GUI.
+If an instance is running, the request is forwarded (the second process does
+not print the list).
+.TP
+.BR \-r ", " \-\-raise
+Raise the existing main window.
+.SH ALARM EXPRESSIONS
+.SS Relative
+.BR in\ 5m ,
+.BR in\ 2h30m ,
+.BR in\ 1d ,
+.BR 5m ,
+.BR 30s
+.SS Absolute
+.BR at\ 15:10 ,
+.BR at\ 2026\-10\-03\ 09:00 ,
+.BR 15:10
+(next occurrence if that clock time has already passed today)
+.SS Notes
+Text after the time expression becomes the alarm label; the command column
+keeps only the time part:
+.PP
+.RS
+.B in 5m kitchen
+.br
+.B in 5m, tea
+.br
+.B at 15:10 standup
+.RE
+.PP
+Parentheses and quotes still work:
+.BR "in 5m (kitchen)" ,
+.BR "in 5m \(dqtea\(dq" .
+.SH KEYBOARD
+.TP
+.B Ctrl+N
+Focus the add line.
+.TP
+.B Enter
+Add an alarm from the input line (main window).
+.TP
+.B Ctrl+E
+Edit the selected alarm.
+.TP
+.B Ctrl+R
+Restart the selected alarm (re-evaluate its command from now).
+.TP
+.B Delete / Ctrl+D
+Remove the selected alarm(s).
+.TP
+.B Esc
+Hide the main window to the tray; in the notification dialog, snooze 5 minutes.
+.TP
+.B Enter / Space
+Acknowledge in the notification dialog.
+.SH FILES
+.TP
+.I ~/.local/share/Grumbel/alarmqt/alarms.json
+Typical path for the JSON alarm store on Linux
+(Qt AppDataLocation with organization
+.B Grumbel
+and application
+.BR alarmqt ).
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Could not parse an alarm expression given on the command line.
+.SH EXAMPLES
+.TP
+Start or raise the app:
+.RS
+.B alarmqt
+.RE
+.TP
+Add a relative alarm with a note:
+.RS
+.B alarmqt \(dqin 5m kitchen\(dq
+.RE
+.TP
+Add an absolute alarm:
+.RS
+.B alarmqt \(dqat 15:10\(dq
+.RE
+.TP
+List alarms without opening the GUI (when idle):
+.RS
+.B alarmqt \-\-list
+.RE
+.SH SEE ALSO
+.UR https://github.com/Grumbel/alarmqt
+.UE
+.SH AUTHOR
+Ingo Ruhnke <grumbel@gmail.com>

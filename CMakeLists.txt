@@ -62,3 +62,7 @@ install(FILES icons/alarm.svg
 
 install(FILES share/metainfo/alarmqt.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+
+install(FILES man/alarmqt.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
