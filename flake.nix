@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 {
   description = "Simple system-tray alarm app (Qt6 / C++)";
 
@@ -33,7 +36,7 @@
 
           meta = with pkgs.lib; {
             description = "Keyboard-friendly system-tray alarm / reminder";
-            homepage = "https://github.com/example/alarmqt";
+            homepage = "https://github.com/Grumbel/alarmqt";
             license = licenses.gpl3Plus;
             platforms = platforms.linux;
             mainProgram = "alarmqt";

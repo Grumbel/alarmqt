@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "MainWindow.h"
 
 #include <QApplication>
@@ -11,7 +14,6 @@
 #include <QShortcut>
 #include <QStyle>
 #include <QIcon>
-#include <QSet>
 #include <QTimeZone>
 
 MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
@@ -51,7 +53,10 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     layout->addWidget(m_status);
 
     // Shortcuts
-    new QShortcut(QKeySequence::New, this, [this]() { m_input->setFocus(); m_input->selectAll(); });
+    new QShortcut(QKeySequence::New, this, [this]() {
+        m_input->setFocus();
+        m_input->selectAll();
+    });
     new QShortcut(QKeySequence::Delete, this, &MainWindow::removeSelected);
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, &MainWindow::removeSelected);
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
@@ -59,15 +64,19 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
     connect(m_manager, &AlarmManager::alarmTriggered, this, &MainWindow::onAlarmTriggered);
     connect(m_manager, &AlarmManager::alarmAcknowledged, this, [this](const QUuid& id) {
-        if (auto* d = m_dialogs.take(id)) {
+        m_activeTriggered.remove(id);
+        if (auto* d = m_dialogs.take(id))
             d->deleteLater();
-        }
     });
+
+    // Re-notify every 30 s while any alarm is still triggered / unacked
+    m_renotifyTimer.setInterval(30'000);
+    connect(&m_renotifyTimer, &QTimer::timeout, this, &MainWindow::renotifyTriggered);
+    m_renotifyTimer.start();
 
     createTray();
     refreshList();
 
-    // Focus input on start
     m_input->setFocus();
 }
 
@@ -112,7 +121,6 @@ void MainWindow::raiseAndActivate() {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    // Close → hide to tray
     hide();
     event->ignore();
 }
@@ -138,7 +146,8 @@ void MainWindow::addFromInput() {
                                 "  in 5m\n"
                                 "  in 2h30m\n"
                                 "  at 15:10\n"
-                                "  at 2026-10-03 09:00").arg(text));
+                                "  at 2026-10-03 09:00")
+                                 .arg(text));
         return;
     }
     m_manager->add(*opt);
@@ -150,29 +159,28 @@ void MainWindow::removeSelected() {
     for (QListWidgetItem* item : items) {
         const QUuid id = item->data(Qt::UserRole).toUuid();
         m_manager->remove(id);
+        m_activeTriggered.remove(id);
         if (auto* d = m_dialogs.take(id))
             d->deleteLater();
     }
 }
 
 void MainWindow::refreshList() {
-    // Preserve selection
     QSet<QUuid> selected;
     for (QListWidgetItem* item : m_list->selectedItems())
         selected.insert(item->data(Qt::UserRole).toUuid());
 
     m_list->clear();
-    const auto nowLocal = QDateTime::currentDateTime();
 
     for (const auto& a : m_manager->alarms()) {
         if (a.acknowledged)
-            continue; // hide finished ones (they stay in storage for a while)
+            continue;
 
         const QDateTime local = a.triggerUtc.toLocalTime();
-        QString text = QStringLiteral("%1    →  %2    (%3)")
-                           .arg(a.remainingString(),
-                                local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")),
-                                a.label);
+        const QString text = QStringLiteral("%1    →  %2    (%3)")
+                                 .arg(a.remainingString(),
+                                      local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")),
+                                      a.label);
 
         auto* item = new QListWidgetItem(text);
         item->setData(Qt::UserRole, a.id);
@@ -203,22 +211,34 @@ void MainWindow::updateTray() {
     if (auto next = m_manager->nextAlarm()) {
         m_tray->setToolTip(tr("AlarmQt – next in %1\n%2")
                                .arg(next->remainingString(), next->label));
-        // Optional: change icon color when soon, but SVG is static
     } else {
         m_tray->setToolTip(tr("AlarmQt – no alarms"));
     }
 }
 
 void MainWindow::onAlarmTriggered(const Alarm& a) {
+    m_activeTriggered.insert(a.id);
     showNotification(a);
+    m_tray->showMessage(tr("Alarm"), a.label, QSystemTrayIcon::Warning, 10'000);
+}
 
-    // Also a tray balloon
-    m_tray->showMessage(tr("Alarm"), a.label,
-                        QSystemTrayIcon::Warning, 10000);
+void MainWindow::renotifyTriggered() {
+    if (m_activeTriggered.isEmpty())
+        return;
+
+    for (const QUuid& id : m_activeTriggered) {
+        const Alarm* a = m_manager->alarmById(id);
+        if (!a || a->acknowledged) {
+            m_activeTriggered.remove(id);
+            continue;
+        }
+        showNotification(*a);
+        m_tray->showMessage(tr("Alarm (still active)"), a->label,
+                            QSystemTrayIcon::Warning, 8'000);
+    }
 }
 
 void MainWindow::showNotification(const Alarm& a) {
-    // If already showing, bring to front
     if (auto* existing = m_dialogs.value(a.id)) {
         existing->raise();
         existing->activateWindow();
@@ -230,10 +250,12 @@ void MainWindow::showNotification(const Alarm& a) {
 
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {
         m_manager->acknowledge(id);
+        m_activeTriggered.remove(id);
         m_dialogs.remove(id);
     });
     connect(dlg, &NotificationDialog::snoozed, this, [this](const QUuid& id, int mins) {
         m_manager->snooze(id, mins);
+        m_activeTriggered.remove(id);
         m_dialogs.remove(id);
     });
     connect(dlg, &QObject::destroyed, this, [this, id = a.id]() {
@@ -251,18 +273,18 @@ void MainWindow::handleExternalCommand(const QString& cmd) {
         return;
     }
     if (cmd == QLatin1String("--list")) {
-        // secondary already printed; nothing to do
         return;
     }
 
-    // Treat as alarm string
     auto opt = AlarmManager::parse(cmd);
     if (opt) {
         m_manager->add(*opt);
         raiseAndActivate();
-        m_tray->showMessage(tr("Alarm added"), opt->label, QSystemTrayIcon::Information, 3000);
+        m_tray->showMessage(tr("Alarm added"), opt->label,
+                            QSystemTrayIcon::Information, 3'000);
     } else {
-        m_tray->showMessage(tr("Parse error"), tr("Could not parse: %1").arg(cmd),
-                            QSystemTrayIcon::Warning, 5000);
+        m_tray->showMessage(tr("Parse error"),
+                            tr("Could not parse: %1").arg(cmd),
+                            QSystemTrayIcon::Warning, 5'000);
     }
 }

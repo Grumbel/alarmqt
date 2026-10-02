@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "AlarmManager.h"
 
 #include <QDir>
@@ -204,8 +207,11 @@ void AlarmManager::load() {
         return;
     m_alarms.clear();
     for (const auto& v : doc.array()) {
-        if (v.isObject())
-            m_alarms.append(Alarm::fromJson(v.toObject()));
+        if (!v.isObject())
+            continue;
+        Alarm a = Alarm::fromJson(v.toObject());
+        if (!a.acknowledged)
+            m_alarms.append(a);
     }
     std::sort(m_alarms.begin(), m_alarms.end(),
               [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
@@ -213,8 +219,11 @@ void AlarmManager::load() {
 
 void AlarmManager::save() const {
     QJsonArray arr;
-    for (const auto& a : m_alarms)
+    for (const auto& a : m_alarms) {
+        if (a.acknowledged)
+            continue; // drop finished alarms
         arr.append(a.toJson());
+    }
     QFile f(storagePath());
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
         f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));

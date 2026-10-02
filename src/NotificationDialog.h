@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 #include "Alarm.h"
@@ -6,6 +9,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QTimer>
+#include <QKeyEvent>
+#include <QCloseEvent>
 
 class NotificationDialog : public QDialog {
     Q_OBJECT
