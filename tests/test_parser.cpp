@@ -12,6 +12,7 @@ private slots:
     void relative_basic();
     void relative_combined();
     void relative_optional_in();
+    void relative_unit_spellings();
     void absolute_time_only();
     void absolute_full_date();
     void notes_trailing_words();
@@ -58,6 +59,27 @@ void TestParser::relative_optional_in() {
     QCOMPARE(a->command, QStringLiteral("2h"));
     const qint64 s = secsUntil(*a);
     QVERIFY2(s >= 7190 && s <= 7210, qPrintable(QString::number(s)));
+}
+
+void TestParser::relative_unit_spellings() {
+    const struct { const char* input; qint64 secs; } cases[] = {
+        {"in 5 mins", 5 * 60},
+        {"in 2 hrs", 2 * 3600},
+        {"in 1 hour 15 minutes", 75 * 60},
+        {"in 30 secs", 30},
+        {"in 2 days", 2 * 86400},
+    };
+    for (const auto& c : cases) {
+        auto a = AlarmManager::parse(QString::fromUtf8(c.input));
+        QVERIFY2(a.has_value(), c.input);
+        QVERIFY2(a->label.isEmpty(), qPrintable(a->label));
+        const qint64 s = secsUntil(*a);
+        QVERIFY2(s >= c.secs - 2 && s <= c.secs, qPrintable(QString::number(s)));
+    }
+
+    auto b = AlarmManager::parse(QStringLiteral("in 5 mins tea"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->label, QStringLiteral("tea"));
 }
 
 void TestParser::absolute_time_only() {
@@ -128,6 +150,12 @@ void TestParser::invalid_inputs() {
     QVERIFY(!AlarmManager::parse(QStringLiteral("hello")).has_value());
     QVERIFY(!AlarmManager::parse(QStringLiteral("in")).has_value());
     QVERIFY(!AlarmManager::parse(QStringLiteral("at")).has_value());
+    // Unit letters must not be the start of an unrelated word
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 5 hamburgers")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 3 months")).has_value());
+    // Absurd durations are rejected instead of overflowing
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 99999999999999999999d")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 999999999999d")).has_value());
 }
 
 void TestParser::command_is_time_part_only() {

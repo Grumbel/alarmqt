@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimeZone>
 #include <optional>
@@ -35,11 +36,23 @@ Alarm* AlarmManager::alarmById(const QUuid& id) {
     return nullptr;
 }
 
+// One optional "<n> unit" group per unit, in d/h/m/s order. The lookahead
+// keeps "in 5 hamburgers" from matching as "in 5h" + note "amburgers".
+static const QString kDurationPattern = QStringLiteral(
+    R"((?:in\s+)?)"
+    R"((?:(\d+)\s*d(?:ays?)?(?![a-z]))?\s*)"
+    R"((?:(\d+)\s*h(?:ours?|rs?)?(?![a-z]))?\s*)"
+    R"((?:(\d+)\s*m(?:in(?:ute)?s?)?(?![a-z]))?\s*)"
+    R"((?:(\d+)\s*s(?:ec(?:ond)?s?)?(?![a-z]))?)");
+
+// Upper bound for relative alarms; also keeps the arithmetic below in range.
+static constexpr qint64 kMaxRelativeSecs = 100LL * 366 * 86400;
+
 static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     // Matches: in 5m, in 2h30m, in 1d 2h, 5 minutes, etc.
     // Require at least one duration unit; anchor full string.
     static const QRegularExpression re(
-        R"(\A(?:in\s+)?(?:(\d+)\s*d(?:ays?)?)?\s*(?:(\d+)\s*h(?:ours?)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?\s*(?:(\d+)\s*s(?:ec(?:onds?)?)?)?\s*\z)",
+        QStringLiteral(R"(\A)") + kDurationPattern + QStringLiteral(R"(\s*\z)"),
         QRegularExpression::CaseInsensitiveOption);
 
     auto m = re.match(s.trimmed());
@@ -47,12 +60,19 @@ static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
                           && m.captured(3).isEmpty() && m.captured(4).isEmpty()))
         return {};
 
+    static constexpr qint64 kUnitSecs[] = {86400, 3600, 60, 1};
     qint64 secs = 0;
-    if (!m.captured(1).isEmpty()) secs += m.captured(1).toLongLong() * 86400;
-    if (!m.captured(2).isEmpty()) secs += m.captured(2).toLongLong() * 3600;
-    if (!m.captured(3).isEmpty()) secs += m.captured(3).toLongLong() * 60;
-    if (!m.captured(4).isEmpty()) secs += m.captured(4).toLongLong();
-    if (secs <= 0)
+    for (int i = 0; i < 4; ++i) {
+        const QString digits = m.captured(i + 1);
+        if (digits.isEmpty())
+            continue;
+        bool ok = false;
+        const qint64 n = digits.toLongLong(&ok);
+        if (!ok || n > kMaxRelativeSecs / kUnitSecs[i])
+            return {};
+        secs += n * kUnitSecs[i];
+    }
+    if (secs <= 0 || secs > kMaxRelativeSecs)
         return {};
 
     return nowLocal.addSecs(secs);
@@ -130,7 +150,7 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
 
     // 3) Relative duration prefix + trailing words: "in 5s kitchen"
     static const QRegularExpression relPrefix(
-        R"(\A((?:in\s+)?(?:\d+\s*d(?:ays?)?)?\s*(?:\d+\s*h(?:ours?)?)?\s*(?:\d+\s*m(?:in(?:utes?)?)?)?\s*(?:\d+\s*s(?:ec(?:onds?)?)?)?))",
+        QStringLiteral(R"(\A()") + kDurationPattern + QStringLiteral(")"),
         QRegularExpression::CaseInsensitiveOption);
     if (auto rm = relPrefix.match(trimmed); rm.hasMatch()) {
         const QString prefix = rm.captured(1).trimmed();
@@ -196,11 +216,14 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     return a;
 }
 
+void AlarmManager::sortAlarms() {
+    std::stable_sort(m_alarms.begin(), m_alarms.end(),
+                     [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+}
+
 void AlarmManager::add(const Alarm& a) {
     m_alarms.append(a);
-    // keep sorted by trigger time
-    std::sort(m_alarms.begin(), m_alarms.end(),
-              [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+    sortAlarms();
     save();
     emit alarmsChanged();
 }
@@ -208,8 +231,7 @@ void AlarmManager::add(const Alarm& a) {
 void AlarmManager::update(const Alarm& a) {
     if (auto* existing = alarmById(a.id)) {
         *existing = a;
-        std::sort(m_alarms.begin(), m_alarms.end(),
-                  [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+        sortAlarms();
         save();
         emit alarmsChanged();
     }
@@ -242,8 +264,7 @@ void AlarmManager::snooze(const QUuid& id, int minutes) {
         a->triggered = false;
         a->acknowledged = false;
         // keep user label; only clear done/triggered state
-        std::sort(m_alarms.begin(), m_alarms.end(),
-                  [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+        sortAlarms();
         save();
         emit alarmsChanged();
     }
@@ -282,8 +303,7 @@ bool AlarmManager::restart(const QUuid& id) {
                 a->triggerUtc = a->triggerUtc.addDays(1);
             a->acknowledged = false;
             a->triggered = false;
-            std::sort(m_alarms.begin(), m_alarms.end(),
-                      [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+            sortAlarms();
             save();
             emit alarmsChanged();
             return true;
@@ -294,8 +314,7 @@ bool AlarmManager::restart(const QUuid& id) {
     a->triggerUtc = nowUtc.addSecs(a->snoozeMinutes * 60);
     a->acknowledged = false;
     a->triggered = false;
-    std::sort(m_alarms.begin(), m_alarms.end(),
-              [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+    sortAlarms();
     save();
     emit alarmsChanged();
     return true;
@@ -303,22 +322,23 @@ bool AlarmManager::restart(const QUuid& id) {
 
 void AlarmManager::tick() {
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    bool changed = false;
+    // Collect first: receivers may modify the alarm list (ack, snooze, ...).
+    QVector<Alarm> fired;
     for (auto& a : m_alarms) {
         if (!a.acknowledged && !a.triggered && a.isDue(now)) {
             a.triggered = true;
-            changed = true;
-            emit alarmTriggered(a);
+            fired.append(a);
         }
     }
-    if (changed)
+    if (!fired.isEmpty())
         save();
+    for (const Alarm& a : std::as_const(fired))
+        emit alarmTriggered(a);
     // Always emit so UI can refresh countdowns
     emit alarmsChanged();
 }
 
 std::optional<Alarm> AlarmManager::nextAlarm() const {
-    const QDateTime now = QDateTime::currentDateTimeUtc();
     std::optional<Alarm> best;
     for (const auto& a : m_alarms) {
         if (a.acknowledged)
@@ -346,10 +366,17 @@ void AlarmManager::load() {
     for (const auto& v : doc.array()) {
         if (!v.isObject())
             continue;
-        m_alarms.append(Alarm::fromJson(v.toObject()));
+        Alarm a = Alarm::fromJson(v.toObject());
+        if (!a.triggerUtc.isValid()) {
+            qWarning("Skipping stored alarm with invalid trigger time: %s",
+                     qPrintable(a.displayName()));
+            continue;
+        }
+        if (a.id.isNull())
+            a.id = QUuid::createUuid();
+        m_alarms.append(a);
     }
-    std::sort(m_alarms.begin(), m_alarms.end(),
-              [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+    sortAlarms();
 
     // After restart, re-arm due alarms so tick() will notify again
     const QDateTime now = QDateTime::currentDateTimeUtc();
@@ -363,7 +390,11 @@ void AlarmManager::save() const {
     QJsonArray arr;
     for (const auto& a : m_alarms)
         arr.append(a.toJson());
-    QFile f(storagePath());
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+    // Write atomically so a crash or full disk cannot truncate the alarm list.
+    QSaveFile f(storagePath());
+    if (!f.open(QIODevice::WriteOnly)
+        || f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented)) < 0
+        || !f.commit())
+        qWarning("Could not save alarms to %s: %s",
+                 qPrintable(f.fileName()), qPrintable(f.errorString()));
 }

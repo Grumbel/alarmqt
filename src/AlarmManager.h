@@ -18,7 +18,7 @@ class AlarmManager : public QObject {
 public:
     explicit AlarmManager(QObject* parent = nullptr);
 
-    QVector<Alarm> alarms() const { return m_alarms; }
+    const QVector<Alarm>& alarms() const { return m_alarms; }
     const Alarm* alarmById(const QUuid& id) const;
     Alarm* alarmById(const QUuid& id);
 
@@ -50,6 +50,8 @@ private slots:
     void tick();
 
 private:
+    void sortAlarms();
+
     QVector<Alarm> m_alarms;
     QTimer m_timer;
     QString storagePath() const;
