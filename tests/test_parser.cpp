@@ -80,7 +80,7 @@ void TestParser::relative_unit_spellings() {
 
     auto b = AlarmManager::parse(QStringLiteral("in 5 mins stretch"));
     QVERIFY(b.has_value());
-    QCOMPARE(b->label, QStringLiteral("water plants"));
+    QCOMPARE(b->label, QStringLiteral("stretch"));
 }
 
 void TestParser::absolute_time_only() {
@@ -130,7 +130,7 @@ void TestParser::absolute_american_ampm() {
 void TestParser::notes_trailing_words() {
     auto a = AlarmManager::parse(QStringLiteral("in 10m stretch"));
     QVERIFY(a.has_value());
-    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QCOMPARE(a->command, QStringLiteral("in 10m"));
     QCOMPARE(a->label, QStringLiteral("stretch"));
 
     auto b = AlarmManager::parse(QStringLiteral("at 15:10 team call"));
@@ -140,7 +140,7 @@ void TestParser::notes_trailing_words() {
 }
 
 void TestParser::notes_comma() {
-    auto a = AlarmManager::parse(QStringLiteral("in 5s, tea"));
+    auto a = AlarmManager::parse(QStringLiteral("in 5s, water plants"));
     QVERIFY(a.has_value());
     QCOMPARE(a->command, QStringLiteral("in 5s"));
     QCOMPARE(a->label, QStringLiteral("water plants"));
@@ -150,12 +150,12 @@ void TestParser::notes_parens_and_quotes() {
     auto a = AlarmManager::parse(QStringLiteral("in 5m (laundry)"));
     QVERIFY(a.has_value());
     QCOMPARE(a->command, QStringLiteral("in 5m"));
-    QCOMPARE(a->label, QStringLiteral("stretch"));
+    QCOMPARE(a->label, QStringLiteral("laundry"));
 
-    auto b = AlarmManager::parse(QStringLiteral("in 10m \"tea\""));
+    auto b = AlarmManager::parse(QStringLiteral("in 10m \"pick up kids\""));
     QVERIFY(b.has_value());
     QCOMPARE(b->command, QStringLiteral("in 10m"));
-    QCOMPARE(b->label, QStringLiteral("water plants"));
+    QCOMPARE(b->label, QStringLiteral("pick up kids"));
 
     auto c = AlarmManager::parse(QStringLiteral("in 1m 'oven'"));
     QVERIFY(c.has_value());
@@ -166,7 +166,7 @@ void TestParser::explicit_label_overrides_note() {
     auto a = AlarmManager::parse(QStringLiteral("in 10m stretch"), QStringLiteral("forced"));
     QVERIFY(a.has_value());
     QCOMPARE(a->label, QStringLiteral("forced"));
-    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QCOMPARE(a->command, QStringLiteral("in 10m"));
 }
 
 void TestParser::invalid_inputs() {
