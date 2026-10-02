@@ -13,6 +13,12 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        inherit (pkgs) lib;
+        # Qt Multimedia dlopens these at runtime (not linked into the binary).
+        mediaRuntimeLibs = with pkgs; [
+          pipewire
+          libpulseaudio
+        ];
       in {
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "alarmqt";
@@ -29,13 +35,18 @@
             qt6.qtbase
             qt6.qtsvg          # for SVG icon
             qt6.qtmultimedia  # alarm sound
+          ] ++ mediaRuntimeLibs;
+
+          # So QSoundEffect's PipeWire/Pulse backends can dlopen successfully.
+          qtWrapperArgs = [
+            "--prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath mediaRuntimeLibs}"
           ];
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
           ];
 
-          meta = with pkgs.lib; {
+          meta = with lib; {
             description = "Keyboard-friendly system-tray alarm / reminder";
             homepage = "https://github.com/Grumbel/alarmqt";
             license = licenses.gpl3Plus;
@@ -51,10 +62,12 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
           buildInputs = with pkgs; [
-            qt6.qttools        # designer, lupdate, …
+            qt6.qttools
             gdb
             clang-tools
           ];
+          # Same runtime path when developing via `nix develop`
+          LD_LIBRARY_PATH = lib.makeLibraryPath mediaRuntimeLibs;
         };
       });
 }
