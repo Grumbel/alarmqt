@@ -16,6 +16,7 @@ path = [
   "README.md",
   "AGENTS.md",
   "TODO.md",
+  "screenshot.png",
   ".gitignore",
 ]
 precedence = "aggregate"

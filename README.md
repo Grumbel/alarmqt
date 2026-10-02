@@ -2,6 +2,8 @@
 
 Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 
+![AlarmQt main window](screenshot.png)
+
 ## Features
 
 - **Relative & absolute alarms**
