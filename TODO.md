@@ -3,17 +3,17 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** see `git log -1 --oneline` after applying latest bundle
-- **Next bundle NNN:** 002 (001 was the initial checkin on GitHub)
+- **Current tip:** `fc6b0d0` – fix: re-notify every 30s until ack; prune finished alarms
+- **Next bundle NNN:** 003 (002 is the bundle that reaches this tip)
 
 ## Done in this line
 
-- Initial QWidget app: tray, single-instance, relative/absolute parse, JSON persistence, ack/snooze dialog
+- Initial QWidget app: tray, single-instance, relative/absolute parse, JSON persistence, ack/snooze dialog (`071e920`)
 - Continuity docs (`AGENTS.md`, `TODO.md`)
-- REUSE / SPDX / LICENSE
+- REUSE / SPDX / LICENSE (GPL-3.0-or-later)
 - Re-notify loop while alarm is triggered and unacknowledged
-- Prune acknowledged alarms on save
-- flake homepage + minor polish
+- Prune acknowledged alarms on load/save
+- flake homepage + README wording
 
 ## Open / nice-to-have
 
@@ -24,7 +24,7 @@
 - [ ] `--list` should print from primary via reply protocol (currently secondary only hints)
 - [ ] Unit tests for the time parser
 - [ ] Install icon/desktop file paths verified under Nix
-- [ ] Confirm build on NixOS (sandbox had no `nix` / Qt)
+- [ ] Confirm build on NixOS (agent sandbox had no `nix` / Qt)
 
 ## Known limitations
 
