@@ -32,17 +32,19 @@ protected:
     void done(int r) override;
 
 private:
-    void setBlinkOn(bool on);
+    void setBlinkPhase(bool leftRed);
     void playSound();
     void stopAlert();
 
     Alarm m_alarm;
     QLabel* m_title = nullptr;
+    QLabel* m_when = nullptr;
     QLabel* m_subtitle = nullptr;
     QFrame* m_leftBlink = nullptr;
     QFrame* m_rightBlink = nullptr;
     QTimer m_blinkTimer;
-    bool m_blinkOn = false;
+    QTimer m_soundTimer;
+    bool m_leftRed = true;
     bool m_closing = false;
     QSoundEffect* m_sound = nullptr;
 };

@@ -13,6 +13,17 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+namespace {
+constexpr int kBlinkIntervalMs = 250;
+constexpr int kSoundIntervalMs = 1500;
+constexpr int kSquareSize = 36;
+
+const char* kStyleRed =
+    "QFrame { background-color: #e53e3e; border: 1px solid #9b2c2c; }";
+const char* kStyleBlack =
+    "QFrame { background-color: #000000; border: 1px solid #1a1a1a; }";
+} // namespace
+
 NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     : QDialog(parent)
     , m_alarm(alarm)
@@ -21,31 +32,37 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint);
     setAttribute(Qt::WA_DeleteOnClose);
     setModal(false);
-    setMinimumWidth(420);
-    setMinimumHeight(160);
+    setMinimumWidth(440);
+    setMinimumHeight(180);
 
-    setStyleSheet(QStringLiteral(
-        "QDialog { background-color: #1a202c; color: #f7fafc; }"
-        "QLabel { color: #f7fafc; background: transparent; }"
-        "QPushButton { padding: 8px 14px; }"));
+    // Default system grey background; only the side squares flash.
+    // No dark theme override.
 
     auto* root = new QHBoxLayout(this);
-    root->setSpacing(0);
-    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(8);
+    root->setContentsMargins(8, 8, 8, 8);
 
-    auto makeBlinker = []() {
-        auto* f = new QFrame;
-        f->setFixedWidth(18);
-        f->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-        f->setStyleSheet(QStringLiteral("QFrame { background-color: #2d3748; border: none; }"));
-        return f;
+    auto makeSquareColumn = [](QFrame** outSquare) {
+        auto* column = new QWidget;
+        auto* colLay = new QVBoxLayout(column);
+        colLay->setContentsMargins(0, 0, 0, 0);
+        colLay->setSpacing(0);
+        colLay->addStretch(1);
+        auto* sq = new QFrame;
+        sq->setFixedSize(kSquareSize, kSquareSize);
+        sq->setStyleSheet(QString::fromUtf8(kStyleBlack));
+        colLay->addWidget(sq, 0, Qt::AlignHCenter);
+        colLay->addStretch(1);
+        *outSquare = sq;
+        return column;
     };
-    m_leftBlink = makeBlinker();
-    m_rightBlink = makeBlinker();
+
+    auto* leftCol = makeSquareColumn(&m_leftBlink);
+    auto* rightCol = makeSquareColumn(&m_rightBlink);
 
     auto* center = new QWidget;
     auto* centerLayout = new QVBoxLayout(center);
-    centerLayout->setContentsMargins(20, 16, 20, 16);
+    centerLayout->setContentsMargins(12, 8, 12, 8);
 
     m_title = new QLabel(alarm.displayName());
     m_title->setAlignment(Qt::AlignCenter);
@@ -55,12 +72,24 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     m_title->setFont(titleFont);
     m_title->setWordWrap(true);
 
-    m_subtitle = new QLabel(tr("Time is up!"));
+    const QDateTime whenLocal = (alarm.scheduledUtc.isValid() ? alarm.scheduledUtc : alarm.triggerUtc)
+                                    .toLocalTime();
+    m_when = new QLabel(tr("When: %1").arg(
+        whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t"))));
+    m_when->setAlignment(Qt::AlignCenter);
+
+    if (alarm.missed) {
+        m_subtitle = new QLabel(tr("Missed — app was not running at the scheduled time"));
+        m_subtitle->setStyleSheet(QStringLiteral("color: #c53030; font-weight: bold;"));
+    } else {
+        m_subtitle = new QLabel(tr("Time is up!"));
+    }
     m_subtitle->setAlignment(Qt::AlignCenter);
-    m_subtitle->setStyleSheet(QStringLiteral("color: #a0aec0;"));
+    m_subtitle->setWordWrap(true);
 
     centerLayout->addStretch(1);
     centerLayout->addWidget(m_title);
+    centerLayout->addWidget(m_when);
     centerLayout->addWidget(m_subtitle);
     centerLayout->addSpacing(12);
 
@@ -75,9 +104,9 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     centerLayout->addLayout(btnLayout);
     centerLayout->addStretch(1);
 
-    root->addWidget(m_leftBlink);
+    root->addWidget(leftCol);
     root->addWidget(center, 1);
-    root->addWidget(m_rightBlink);
+    root->addWidget(rightCol);
 
     connect(ackBtn, &QPushButton::clicked, this, [this]() {
         emit acknowledged(m_alarm.id);
@@ -100,13 +129,18 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     connect(&m_blinkTimer, &QTimer::timeout, this, [this]() {
         if (m_closing)
             return;
-        m_blinkOn = !m_blinkOn;
-        setBlinkOn(m_blinkOn);
-        if (m_blinkOn)
+        m_leftRed = !m_leftRed;
+        setBlinkPhase(m_leftRed);
+    });
+    m_blinkTimer.start(kBlinkIntervalMs);
+
+    connect(&m_soundTimer, &QTimer::timeout, this, [this]() {
+        if (!m_closing)
             playSound();
     });
-    m_blinkTimer.start(700);
-    setBlinkOn(true);
+    m_soundTimer.start(kSoundIntervalMs);
+
+    setBlinkPhase(true);
     playSound();
 
     adjustSize();
@@ -127,6 +161,7 @@ NotificationDialog::~NotificationDialog() {
 void NotificationDialog::stopAlert() {
     m_closing = true;
     m_blinkTimer.stop();
+    m_soundTimer.stop();
     if (m_sound) {
         m_sound->stop();
     }
@@ -137,12 +172,9 @@ void NotificationDialog::done(int r) {
     QDialog::done(r);
 }
 
-void NotificationDialog::setBlinkOn(bool on) {
-    const char* style = on
-                            ? "QFrame { background-color: #fc8181; border: none; }"
-                            : "QFrame { background-color: #2d3748; border: none; }";
-    m_leftBlink->setStyleSheet(QString::fromUtf8(style));
-    m_rightBlink->setStyleSheet(QString::fromUtf8(style));
+void NotificationDialog::setBlinkPhase(bool leftRed) {
+    m_leftBlink->setStyleSheet(QString::fromUtf8(leftRed ? kStyleRed : kStyleBlack));
+    m_rightBlink->setStyleSheet(QString::fromUtf8(leftRed ? kStyleBlack : kStyleRed));
 }
 
 void NotificationDialog::playSound() {
