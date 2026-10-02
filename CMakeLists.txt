@@ -29,14 +29,14 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus Svg Multimedia)
 
 add_executable(alarmqt
   src/main.cpp
   src/Alarm.cpp
   src/AlarmManager.cpp
   src/MainWindow.cpp
-  src/SingleInstance.cpp
+  src/AlarmDBus.cpp
   src/NotificationDialog.cpp
   resources.qrc
 )
@@ -46,7 +46,7 @@ target_link_libraries(alarmqt PRIVATE
   Qt6::Core
   Qt6::Gui
   Qt6::Widgets
-  Qt6::Network
+  Qt6::DBus
   Qt6::Svg
   Qt6::Multimedia
 )

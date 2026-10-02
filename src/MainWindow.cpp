@@ -29,7 +29,6 @@
 #include <QFontMetrics>
 #include <QSizePolicy>
 #include <QStatusBar>
-#include <QLocalSocket>
 
 #include <algorithm>
 
@@ -693,71 +692,3 @@ void MainWindow::showNotification(const Alarm& a) {
     });
 }
 
-static QString formatAlarmListLine(const Alarm& a) {
-    const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
-    const auto local = whenSrc.toLocalTime();
-    QString st;
-    if (a.acknowledged)
-        st = QStringLiteral("DONE");
-    else if (a.missed)
-        st = QStringLiteral("MISSED");
-    else if (a.triggered)
-        st = QStringLiteral("DUE");
-    else if (a.snoozed)
-        st = QStringLiteral("SNOOZED");
-    else
-        st = QStringLiteral("ACTIVE");
-
-    QString remaining;
-    if (a.acknowledged)
-        remaining = QStringLiteral("—");
-    else if (a.snoozed)
-        remaining = QStringLiteral("snooze %1").arg(a.remainingString());
-    else
-        remaining = a.remainingString();
-
-    QString line = QStringLiteral("%1  %2  %3  [%4]")
-                       .arg(st, remaining,
-                            local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")),
-                            a.command);
-    if (!a.label.isEmpty())
-        line += QLatin1Char(' ') + a.label;
-    return line;
-}
-
-void MainWindow::handleExternalCommand(const QString& cmd, QLocalSocket* replySocket) {
-    const QString c = cmd.trimmed();
-    if (c == QLatin1String("--raise") || c.isEmpty()) {
-        raiseAndActivate();
-        return;
-    }
-    if (c == QLatin1String("--quit")) {
-        QApplication::exit(0);
-        return;
-    }
-    if (c == QLatin1String("--list")) {
-        if (replySocket) {
-            QByteArray body;
-            for (const auto& a : m_manager->alarms()) {
-                body += formatAlarmListLine(a).toUtf8();
-                body += static_cast<char>(0x0A);
-            }
-            replySocket->write(body);
-            replySocket->flush();
-            replySocket->waitForBytesWritten(1000);
-        }
-        return;
-    }
-
-    auto opt = AlarmManager::parse(c);
-    if (opt) {
-        m_manager->add(*opt);
-        raiseAndActivate();
-        m_tray->showMessage(tr("Alarm added"), opt->displayName(),
-                            QSystemTrayIcon::Information, 3'000);
-    } else {
-        m_tray->showMessage(tr("Parse error"),
-                            tr("Could not parse: %1").arg(c),
-                            QSystemTrayIcon::Warning, 5'000);
-    }
-}

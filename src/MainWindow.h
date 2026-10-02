@@ -15,7 +15,6 @@
 #include <QTimer>
 #include <QSet>
 
-class QLocalSocket;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -25,7 +24,6 @@ public:
 
 public slots:
     void raiseAndActivate();
-    void handleExternalCommand(const QString& cmd, QLocalSocket* replySocket = nullptr);
 
 protected:
     void closeEvent(QCloseEvent* event) override;

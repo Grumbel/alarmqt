@@ -21,7 +21,7 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 | `AlarmManager` | Parse, persist (`~/.local/share/Grumbel/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
 | `NotificationDialog` | Always-on-top dialog; side blinkers + sound; Ack / Snooze |
-| `SingleInstance` | `QLocalServer` – second process forwards CLI (one `\n`-terminated line) and exits |
+| `AlarmDBus (session bus `alarmqt.app`)` | `D-Bus` – second process forwards CLI (one `\n`-terminated line) and exits |
 
 - Alarms are stored as absolute UTC; UI shows local time.
 - `command` = time expression (`in 5m`, `at 15:10`); `label` = optional note.

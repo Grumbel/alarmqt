@@ -1,21 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "AlarmDBus.h"
 #include "AlarmManager.h"
 #include "MainWindow.h"
-#include "SingleInstance.h"
 
 #include <QApplication>
-#include <QIcon>
 #include <QCommandLineParser>
+#include <QDBusConnection>
+#include <QDBusInterface>
+#include <QDBusReply>
+#include <QIcon>
 #include <QDebug>
 #include <iostream>
 
 #ifndef ALARMQT_VERSION
 #  define ALARMQT_VERSION "0.0.0-unknown"
 #endif
-
-static const QString kAppKey = QStringLiteral("alarmqt-single-instance-v1");
 
 static QString statusLabel(const Alarm& a) {
     if (a.acknowledged)
@@ -53,6 +54,31 @@ static void printAlarmList(const AlarmManager& manager, bool includeDone) {
     }
 }
 
+/** Call a method on the running primary; return true if the bus call was delivered. */
+static bool callPrimary(const QString& method, const QVariantList& args = {},
+                        QString* outString = nullptr, QStringList* outList = nullptr) {
+    QDBusInterface iface(QLatin1String(AlarmDBus::serviceName()),
+                         QLatin1String(AlarmDBus::objectPath()),
+                         QLatin1String(AlarmDBus::interfaceName()),
+                         QDBusConnection::sessionBus());
+    if (!iface.isValid()) {
+        qWarning("D-Bus interface invalid: %s",
+                 qPrintable(iface.lastError().message()));
+        return false;
+    }
+    QDBusMessage reply = iface.callWithArgumentList(QDBus::Block, method, args);
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning("D-Bus %s failed: %s", qPrintable(method),
+                 qPrintable(reply.errorMessage()));
+        return false;
+    }
+    if (outString && !reply.arguments().isEmpty())
+        *outString = reply.arguments().at(0).toString();
+    if (outList && !reply.arguments().isEmpty())
+        *outList = reply.arguments().at(0).toStringList();
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
@@ -73,7 +99,7 @@ int main(int argc, char* argv[]) {
                                  QStringLiteral("[expression]"));
     parser.addOption({{"q", "quit"}, QStringLiteral("Quit the running instance")});
     parser.addOption({{"l", "list"},
-                      QStringLiteral("List alarms (primary prints; secondary asks primary)")});
+                      QStringLiteral("List alarms (via D-Bus if a primary is running)")});
     parser.addOption({{"r", "raise"}, QStringLiteral("Raise the existing window")});
     parser.process(app);
 
@@ -82,57 +108,74 @@ int main(int argc, char* argv[]) {
     const bool wantList = parser.isSet(QStringLiteral("list"));
     const bool wantRaise = parser.isSet(QStringLiteral("raise"));
 
-    QString message;
-    if (wantQuit)
-        message = QStringLiteral("--quit");
-    else if (wantList)
-        message = QStringLiteral("--list");
-    else if (wantRaise)
-        message = QStringLiteral("--raise");
-    else if (!pos.isEmpty())
-        message = pos.join(QLatin1Char(' '));
-    else
-        message = QStringLiteral("--raise");
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    const bool busOk = bus.isConnected();
+    if (!busOk)
+        qWarning("No D-Bus session bus; single-instance and remote CLI disabled");
 
-    SingleInstance instance(kAppKey);
+    // Own alarmqt.app → we are primary. Failure → another instance holds the name.
+    const bool isPrimary = !busOk
+        || bus.registerService(QLatin1String(AlarmDBus::serviceName()));
 
-    if (!instance.isPrimary()) {
+    if (!isPrimary) {
         if (wantList) {
-            QString reply;
-            if (SingleInstance::sendMessage(kAppKey, message, &reply)) {
-                std::cout << reply.toStdString();
-                if (!reply.isEmpty() && !reply.endsWith(QLatin1Char('\n')))
+            QString text;
+            if (!callPrimary(QStringLiteral("List"), {}, &text))
+                return 1;
+            if (!text.isEmpty()) {
+                std::cout << text.toStdString();
+                if (!text.endsWith(QLatin1Char('\n')))
                     std::cout << '\n';
-                return 0;
             }
-            qWarning("Could not contact primary instance for --list");
-            return 1;
-        }
-        if (SingleInstance::sendMessage(kAppKey, message)) {
-            if (!wantQuit && !wantRaise && !pos.isEmpty())
-                std::cout << "Sent alarm to running instance: " << message.toStdString() << "\n";
             return 0;
         }
-        qWarning("Could not contact primary instance, starting anyway");
+        if (wantQuit) {
+            callPrimary(QStringLiteral("Quit"));
+            return 0;
+        }
+        if (wantRaise || pos.isEmpty()) {
+            callPrimary(QStringLiteral("Raise"));
+            return 0;
+        }
+        // Add expression on primary
+        const QString expr = pos.join(QLatin1Char(' '));
+        QString err;
+        if (!callPrimary(QStringLiteral("Add"), {expr}, &err))
+            return 1;
+        if (!err.isEmpty()) {
+            std::cerr << err.toStdString() << "\n";
+            return 1;
+        }
+        std::cout << "Sent alarm to running instance: " << expr.toStdString() << "\n";
+        return 0;
     }
 
-    // Primary with --quit and nothing else useful: just exit
+    // Primary
     if (wantQuit) {
+        // Nothing to quit (we just became primary with no prior instance)
         return 0;
     }
 
     AlarmManager manager;
+    AlarmDBus dbusApi(&manager, nullptr);
 
-    // --list only: print and exit without GUI
+    if (busOk) {
+        if (!bus.registerObject(QLatin1String(AlarmDBus::objectPath()), &dbusApi,
+                                QDBusConnection::ExportAllSlots)) {
+            qWarning("Could not register D-Bus object %s: %s",
+                     AlarmDBus::objectPath(),
+                     qPrintable(bus.lastError().message()));
+        }
+    }
+
+    // --list only: print and exit without GUI (still owned the name briefly)
     if (wantList && pos.isEmpty() && !wantRaise) {
         printAlarmList(manager, true);
         return 0;
     }
 
     MainWindow window(&manager);
-
-    QObject::connect(&instance, &SingleInstance::messageReceived,
-                     &window, &MainWindow::handleExternalCommand);
+    dbusApi.setWindow(&window);
 
     if (!pos.isEmpty()) {
         const QString expr = pos.join(QLatin1Char(' '));
