@@ -16,6 +16,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Keyboard-driven**
   - `Ctrl+N` / focus line edit → type alarm → Enter
   - `Delete` / `Ctrl+D` remove selected
+  - `Ctrl+E` edit · `Ctrl+R` restart
   - `Space` / Enter on triggered dialog = Acknowledge
   - `Esc` hides window to tray
 - **Countdown** shown for every alarm and in the tray tooltip
@@ -24,6 +25,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Command** (expression) and **Label** (note) are separate columns
 - **Edit** via button, Ctrl+E, or double-click
 - **Restart** re-arms from the original command (button, Ctrl+R, or right-click)
+- **Clear DONE** from context menu or tray (removes finished alarms in bulk)
 - Classic **QWidget** UI (no QML)
 
 ## Build (Nix)

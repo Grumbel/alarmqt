@@ -25,6 +25,8 @@
 #include <QColor>
 #include <QFont>
 
+#include <algorithm>
+
 namespace {
 constexpr int kColStatus = 0;
 constexpr int kColRemaining = 1;
@@ -177,6 +179,7 @@ void MainWindow::createTray() {
         raiseAndActivate();
         m_input->setFocus();
     });
+    menu->addAction(tr("Clear DONE alarms"), this, &MainWindow::clearDoneAlarms);
     menu->addSeparator();
     menu->addAction(tr("Quit"), qApp, &QApplication::quit);
     m_tray->setContextMenu(menu);
@@ -265,6 +268,21 @@ void MainWindow::removeSelected() {
     }
 }
 
+void MainWindow::clearDoneAlarms() {
+    const int n = std::count_if(m_manager->alarms().begin(), m_manager->alarms().end(),
+                                [](const Alarm& a) { return a.acknowledged; });
+    if (n == 0) {
+        QMessageBox::information(this, tr("Clear DONE"), tr("No DONE alarms to clear."));
+        return;
+    }
+    const auto answer = QMessageBox::question(
+        this, tr("Clear DONE"),
+        tr("Permanently remove %1 DONE alarm(s)?").arg(n));
+    if (answer != QMessageBox::Yes)
+        return;
+    m_manager->clearDone();
+}
+
 void MainWindow::restartSelected() {
     const auto rows = m_table->selectionModel()->selectedRows();
     if (rows.isEmpty()) {
@@ -293,6 +311,7 @@ void MainWindow::onTableContextMenu(const QPoint& pos) {
     menu.addAction(tr("Restart"), this, &MainWindow::restartSelected);
     menu.addSeparator();
     menu.addAction(tr("Remove"), this, &MainWindow::removeSelected);
+    menu.addAction(tr("Clear all DONE"), this, &MainWindow::clearDoneAlarms);
     menu.exec(m_table->viewport()->mapToGlobal(pos));
 }
 

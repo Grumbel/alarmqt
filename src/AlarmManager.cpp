@@ -194,6 +194,19 @@ void AlarmManager::snooze(const QUuid& id, int minutes) {
     }
 }
 
+int AlarmManager::clearDone() {
+    const auto oldSize = m_alarms.size();
+    m_alarms.erase(std::remove_if(m_alarms.begin(), m_alarms.end(),
+                                  [](const Alarm& a) { return a.acknowledged; }),
+                   m_alarms.end());
+    const int removed = static_cast<int>(oldSize - m_alarms.size());
+    if (removed > 0) {
+        save();
+        emit alarmsChanged();
+    }
+    return removed;
+}
+
 bool AlarmManager::restart(const QUuid& id) {
     Alarm* a = alarmById(id);
     if (!a)

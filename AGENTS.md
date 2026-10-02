@@ -21,6 +21,8 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 
 Alarms are stored as absolute UTC. UI shows local time. Relative (`in 5m`) and absolute (`at 15:10`) parsing lives in `AlarmManager::parse`.
 
+`command` is the time expression; `label` is an optional note. Acknowledged alarms stay as DONE until removed or cleared.
+
 ## Standing rules
 
 - Prefer correct design over quick hacks.

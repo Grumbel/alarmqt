@@ -32,6 +32,8 @@ public:
     void snooze(const QUuid& id, int minutes = -1); // -1 → use alarm's default
     /** Re-arm alarm from its command (or same absolute time next occurrence). */
     bool restart(const QUuid& id);
+    /** Permanently remove all acknowledged alarms. Returns count removed. */
+    int clearDone();
 
     void load();
     void save() const;
