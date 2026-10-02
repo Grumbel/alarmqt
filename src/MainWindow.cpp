@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QFormLayout>
 #include <QHeaderView>
+#include <QItemSelection>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMessageBox>
@@ -174,6 +175,14 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_input->setFocus();
 }
 
+MainWindow::~MainWindow() {
+    // Notification dialogs are child widgets and only get deleted by the
+    // QWidget base destructor, after our members are gone. Cut their
+    // connections first so their destroyed() handler cannot touch m_dialogs.
+    for (auto* dlg : findChildren<NotificationDialog*>())
+        disconnect(dlg, nullptr, this, nullptr);
+}
+
 void MainWindow::updateClock() {
     const QDateTime now = QDateTime::currentDateTime();
     m_clock->setText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss  t")));
@@ -197,7 +206,9 @@ void MainWindow::createTray() {
     });
     menu->addAction(tr("Clear DONE alarms"), this, &MainWindow::clearDoneAlarms);
     menu->addSeparator();
-    menu->addAction(tr("Quit"), qApp, &QApplication::quit);
+    // exit() rather than quit(): quit() first sends close events, which the
+    // notification dialogs would treat as "snooze".
+    menu->addAction(tr("Quit"), qApp, []() { QApplication::exit(0); });
     m_tray->setContextMenu(menu);
 
     connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::onTrayActivated);
@@ -285,8 +296,9 @@ void MainWindow::removeSelected() {
 }
 
 void MainWindow::clearDoneAlarms() {
-    const int n = std::count_if(m_manager->alarms().begin(), m_manager->alarms().end(),
-                                [](const Alarm& a) { return a.acknowledged; });
+    const auto& alarms = m_manager->alarms();
+    const auto n = std::count_if(alarms.begin(), alarms.end(),
+                                 [](const Alarm& a) { return a.acknowledged; });
     if (n == 0) {
         QMessageBox::information(this, tr("Clear DONE"), tr("No DONE alarms to clear."));
         return;
@@ -351,9 +363,13 @@ void MainWindow::editSelected() {
 }
 
 bool MainWindow::editAlarm(const QUuid& id) {
-    Alarm* a = m_manager->alarmById(id);
-    if (!a)
+    // Work on a copy: dlg.exec() runs a nested event loop during which the
+    // manager may reallocate or drop its alarms (tick, CLI add, remove, ...).
+    const Alarm* current = m_manager->alarmById(id);
+    if (!current)
         return false;
+    const Alarm original = *current;
+    const Alarm* a = &original;
 
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Edit alarm"));
@@ -399,7 +415,11 @@ bool MainWindow::editAlarm(const QUuid& id) {
     if (dlg.exec() != QDialog::Accepted)
         return false;
 
-    Alarm updated = *a;
+    // Pick up state changes made while the dialog was open (fired, snoozed, ...)
+    const Alarm* latest = m_manager->alarmById(id);
+    if (!latest)
+        return false; // removed meanwhile
+    Alarm updated = *latest;
     const QString newCmd = commandEdit->text().trimmed();
     updated.command = newCmd;
     updated.label = labelEdit->text().trimmed();
@@ -425,79 +445,93 @@ bool MainWindow::editAlarm(const QUuid& id) {
     }
 
     updated.acknowledged = doneCheck->isChecked();
-    if (updated.acknowledged)
-        updated.triggered = false;
-    else if (updated.triggerUtc > QDateTime::currentDateTimeUtc())
-        updated.triggered = false;
-    else
-        updated.triggered = false; // past → let tick fire as due
+    // Re-arm; if the new time is already past, the next tick fires it again.
+    updated.triggered = false;
 
     m_manager->update(updated);
-    if (updated.acknowledged) {
-        m_activeTriggered.remove(id);
-        if (auto* d = m_dialogs.take(id))
-            d->deleteLater();
-    }
+    // Any open notification belongs to the old schedule.
+    m_activeTriggered.remove(id);
+    if (auto* d = m_dialogs.take(id))
+        d->deleteLater();
     return true;
 }
 
 void MainWindow::refreshList() {
-    QSet<QUuid> selected;
-    for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
-        if (auto* item = m_table->item(idx.row(), kColStatus))
-            selected.insert(item->data(kRoleId).toUuid());
-    }
-
-    m_table->setRowCount(0);
-
     // Active first (by time), then DONE at the bottom
-    QVector<Alarm> active;
-    QVector<Alarm> done;
-    for (const auto& a : m_manager->alarms()) {
+    QVector<const Alarm*> ordered;
+    for (const auto& a : m_manager->alarms())
+        if (!a.acknowledged)
+            ordered.append(&a);
+    for (const auto& a : m_manager->alarms())
         if (a.acknowledged)
-            done.append(a);
-        else
-            active.append(a);
+            ordered.append(&a);
+
+    // This runs every second. Only rebuild the rows when the set or order of
+    // alarms changed; otherwise update the cells in place so selection,
+    // current row and scroll position survive the countdown refresh.
+    bool sameRows = m_table->rowCount() == ordered.size();
+    for (int row = 0; sameRows && row < ordered.size(); ++row) {
+        auto* item = m_table->item(row, kColStatus);
+        sameRows = item && item->data(kRoleId).toUuid() == ordered[row]->id;
     }
 
-    auto addRow = [&](const Alarm& a) {
-        const int row = m_table->rowCount();
-        m_table->insertRow(row);
-
-        const QDateTime local = a.triggerUtc.toLocalTime();
-        auto* status = new QTableWidgetItem(statusText(a));
-        auto* remaining = new QTableWidgetItem(
-            a.acknowledged ? QStringLiteral("—") : a.remainingString());
-        auto* when = new QTableWidgetItem(
-            local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
-        auto* command = new QTableWidgetItem(a.command);
-        auto* label = new QTableWidgetItem(a.label.isEmpty() ? QStringLiteral("—") : a.label);
-
-        status->setData(kRoleId, a.id);
-        remaining->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        status->setTextAlignment(Qt::AlignCenter);
-
-        const QColor bg = rowBackground(a);
-        for (QTableWidgetItem* item : {status, remaining, when, command, label}) {
-            if (bg.isValid())
-                item->setBackground(bg);
-            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+    QSet<QUuid> selected;
+    QUuid currentId;
+    if (!sameRows) {
+        for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
+            if (auto* item = m_table->item(idx.row(), kColStatus))
+                selected.insert(item->data(kRoleId).toUuid());
         }
+        if (auto* item = m_table->item(m_table->currentRow(), kColStatus))
+            currentId = item->data(kRoleId).toUuid();
+        m_table->setRowCount(0);
+        m_table->setRowCount(ordered.size());
+    }
 
-        m_table->setItem(row, kColStatus, status);
-        m_table->setItem(row, kColRemaining, remaining);
-        m_table->setItem(row, kColWhen, when);
-        m_table->setItem(row, kColCommand, command);
-        m_table->setItem(row, kColLabel, label);
-
-        if (selected.contains(a.id))
-            m_table->selectRow(row);
+    auto setCell = [this](int row, int col, const QString& text) {
+        auto* item = m_table->item(row, col);
+        if (!item) {
+            item = new QTableWidgetItem;
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            if (col == kColStatus)
+                item->setTextAlignment(Qt::AlignCenter);
+            else if (col == kColRemaining)
+                item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            m_table->setItem(row, col, item);
+        }
+        if (item->text() != text)
+            item->setText(text);
+        return item;
     };
 
-    for (const auto& a : active)
-        addRow(a);
-    for (const auto& a : done)
-        addRow(a);
+    QItemSelection restoreSelection;
+    for (int row = 0; row < ordered.size(); ++row) {
+        const Alarm& a = *ordered[row];
+        const QDateTime local = a.triggerUtc.toLocalTime();
+
+        auto* status = setCell(row, kColStatus, statusText(a));
+        status->setData(kRoleId, a.id);
+        setCell(row, kColRemaining,
+                a.acknowledged ? QStringLiteral("—") : a.remainingString());
+        setCell(row, kColWhen, local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+        setCell(row, kColCommand, a.command);
+        setCell(row, kColLabel, a.label.isEmpty() ? QStringLiteral("—") : a.label);
+
+        const QColor bg = rowBackground(a);
+        for (int col = 0; col < m_table->columnCount(); ++col)
+            m_table->item(row, col)->setBackground(bg.isValid() ? QBrush(bg) : QBrush());
+
+        if (!sameRows) {
+            if (selected.contains(a.id))
+                restoreSelection.select(m_table->model()->index(row, 0),
+                                        m_table->model()->index(row, m_table->columnCount() - 1));
+            if (a.id == currentId)
+                m_table->selectionModel()->setCurrentIndex(m_table->model()->index(row, 0),
+                                                           QItemSelectionModel::NoUpdate);
+        }
+    }
+    if (!restoreSelection.isEmpty())
+        m_table->selectionModel()->select(restoreSelection, QItemSelectionModel::ClearAndSelect);
 
     updateTray();
     updateClock();
@@ -532,7 +566,9 @@ void MainWindow::renotifyTriggered() {
     if (m_activeTriggered.isEmpty())
         return;
 
-    for (const QUuid& id : std::as_const(m_activeTriggered)) {
+    // Iterate a copy: entries are removed from the set inside the loop.
+    const QSet<QUuid> ids = m_activeTriggered;
+    for (const QUuid& id : ids) {
         const Alarm* a = m_manager->alarmById(id);
         if (!a || a->acknowledged) {
             m_activeTriggered.remove(id);
@@ -577,7 +613,7 @@ void MainWindow::handleExternalCommand(const QString& cmd) {
         return;
     }
     if (c == QLatin1String("--quit")) {
-        qApp->quit();
+        QApplication::exit(0);
         return;
     }
     if (c == QLatin1String("--list")) {

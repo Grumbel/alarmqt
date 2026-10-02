@@ -109,6 +109,7 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     setBlinkOn(true);
     playSound();
 
+    adjustSize();
     if (auto* screen = QApplication::primaryScreen()) {
         const QRect geo = screen->availableGeometry();
         move(geo.center() - QPoint(width() / 2, height() / 2));
@@ -170,8 +171,9 @@ void NotificationDialog::keyPressEvent(QKeyEvent* event) {
 }
 
 void NotificationDialog::closeEvent(QCloseEvent* event) {
-    if (!m_closing) {
-        // Window manager close → treat as snooze (same as before)
+    if (!m_closing && event->spontaneous()) {
+        // Window manager close → treat as snooze. Programmatic closes (e.g.
+        // application shutdown) leave the alarm due.
         emit snoozed(m_alarm.id, 5);
     }
     stopAlert();

@@ -19,6 +19,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(AlarmManager* manager, QWidget* parent = nullptr);
+    ~MainWindow() override;
 
 public slots:
     void raiseAndActivate();
