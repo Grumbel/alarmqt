@@ -1,8 +1,8 @@
 # AlarmQt – Agent Notes
 
-Notes for automated agents (Grok) working on this repo. Humans contributing
-normally can ignore the **Grok delivery** section and use ordinary git push /
-PR workflow against GitHub.
+Notes for automated agents working on this repo. Agents with direct repo
+access (e.g. Claude Code) and humans commit normally and ignore the
+**Grok delivery** section; it only applies to Grok Web sessions.
 
 ## Project
 
@@ -18,15 +18,19 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 | Piece | Role |
 |-------|------|
 | `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, flags) |
-| `AlarmManager` | Parse, persist (`~/.local/share/alarmqt/alarms.json`), 1 Hz tick, signals |
+| `AlarmManager` | Parse, persist (`~/.local/share/Grumbel/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
 | `NotificationDialog` | Always-on-top dialog; side blinkers + sound; Ack / Snooze |
-| `SingleInstance` | `QLocalServer` – second process forwards CLI and exits |
+| `SingleInstance` | `QLocalServer` – second process forwards CLI (one `\n`-terminated line) and exits |
 
 - Alarms are stored as absolute UTC; UI shows local time.
 - `command` = time expression (`in 5m`, `at 15:10`); `label` = optional note.
 - Relative / absolute / note parsing lives in `AlarmManager::parse`.
 - Acknowledged alarms stay as **DONE** until removed or cleared.
+- `AlarmManager::alarms()` returns a reference; never hold `Alarm*` / references
+  across a nested event loop (`QDialog::exec`, `QMessageBox`) – re-look up by id.
+- Quit via `QApplication::exit()`, not `quit()`: Qt 6 `quit()` sends close
+  events, which `NotificationDialog` would treat as snooze.
 
 ## Versioning
 
@@ -50,15 +54,27 @@ alarmqt --raise
 ## Build
 
 ```bash
-nix build
+nix build                # also runs the tests
 nix run . -- "in 1m"
 alarmqt --version
+
+# local dev build + tests
+nix develop -c cmake -B build && nix develop -c cmake --build build
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
+
+Parser tests live in `tests/test_parser.cpp`; extend them when touching
+`AlarmManager::parse`.
+
+When running the GUI for experiments, set `XDG_DATA_HOME` and `XDG_RUNTIME_DIR`
+to temp dirs so you neither touch the user's alarms nor talk to their running
+instance (the single-instance socket name is fixed).
 
 ## Standing rules (agents)
 
 - Prefer correct design over quick hacks; no silent feature removal.
-- New/changed sources: short SPDX headers (`GPL-3.0-or-later`).
+- New/changed sources: short SPDX headers (`GPL-3.0-or-later`). Files that
+  cannot carry a header go into `REUSE.toml`; `reuse lint` must pass.
 - Build and experiment outside the session artifacts tree when possible.
 - Read `TODO.md` at session start; keep tip / next bundle NNN accurate.
 
@@ -66,7 +82,7 @@ alarmqt --version
 
 ## Grok delivery only (git bundles)
 
-**Normal contributors do not use this.** Pushes and pull requests go through
+**Only for Grok Web. Normal contributors and other agents do not use this.** Pushes and pull requests go through
 GitHub as usual. The `.bundle` workflow exists only for Grok sessions that
 cannot push to the remote and must hand commits back as catch-up packages.
 

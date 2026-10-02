@@ -5,14 +5,14 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 ## Features
 
 - **Relative & absolute alarms**
-  - `in 5m`, `in 2h30m`, `in 1d`
+  - `in 5m`, `in 2h30m`, `in 1d`, `in 10 mins`, `in 2 hours`
   - `at 15:10`, `at 2026-10-03 09:00`
   - optional note: `in 5m kitchen`, `in 5m, tea`, `at 15:10 standup`
     (also still accepts `(kitchen)` / `"tea"`)
 - **Timezone-aware** (uses local timezone by default; stores absolute UTC instants)
 - **Persistent** – alarms survive restarts (JSON under Qt AppDataLocation, typically `~/.local/share/Grumbel/alarmqt/alarms.json`)
 - **Repeats until acknowledged** – always-on-top flashing dialog + tray balloon every 30 s until Ack / Snooze
-- **System tray** – icon shows next alarm countdown; left-click toggles window, right-click menu
+- **System tray** – tooltip shows next alarm countdown; left-click toggles window, right-click menu
 - **Single-instance** – starting the binary again focuses the existing window / sends CLI commands
 - **Keyboard-driven**
   - `Ctrl+N` / focus line edit → type alarm → Enter
@@ -50,7 +50,7 @@ alarmqt --quit
 
 ## Dependencies
 
-- Qt6 (Core, Gui, Widgets, Network for local socket)
+- Qt6 (Core, Gui, Widgets, Network for local socket, Svg, Multimedia for the alarm sound)
 - CMake ≥ 3.16
 - C++20
 
@@ -86,4 +86,5 @@ After install: `man alarmqt`
 
 ## License
 
-GPL-3.0-or-later
+GPL-3.0-or-later. The project follows the [REUSE](https://reuse.software/)
+specification; check with `reuse lint`.
