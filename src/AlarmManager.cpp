@@ -140,8 +140,10 @@ static QTimeZone resolveZoneToken(const QString& raw) {
 
 /** If text ends with a glued zone token, peel it into *zone and leave the time text. */
 static bool peelGluedZone(QString* text, QTimeZone* zone) {
+    // The time must end in a digit or am/pm, so "15:10CEST" peels "CEST"
+    // rather than "15:10C" + "EST".
     static const QRegularExpression trailing(
-        QStringLiteral(R"(\A(.+?)") + kGluedZoneSuffix + QStringLiteral(R"()\z)"),
+        QStringLiteral(R"(\A(.*?(?:\d|[ap]\.?m\.?)))") + kGluedZoneSuffix + QStringLiteral(R"(\z)"),
         QRegularExpression::CaseInsensitiveOption);
     const auto m = trailing.match(*text);
     if (!m.hasMatch())
@@ -284,8 +286,10 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
     // 4) Absolute time prefix (+ optional glued zone) + trailing words:
     // "at 15:10 meeting" / "at 15:10CEST standup"
     static const QRegularExpression absPrefix(
-        QStringLiteral(R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)")
-        + kGluedZoneSuffix + QStringLiteral(R"(?)))"),
+        // The zone must follow the time directly, so "15:10 CEST" stays a label;
+        // only am/pm may be separated by a space.
+        QStringLiteral(R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?))")
+        + kGluedZoneSuffix + QStringLiteral(R"(?))"),
         QRegularExpression::CaseInsensitiveOption);
     if (auto am = absPrefix.match(trimmed); am.hasMatch()) {
         const QString prefix = am.captured(1).trimmed();
