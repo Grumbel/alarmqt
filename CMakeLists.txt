@@ -3,6 +3,12 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+# Nix/stdenv passes these on the cmake command line for every project.
+# We are CXX-only and do not use the package registry; reference the values
+# so CMake does not emit "Manually-specified variables were not used" warnings.
+set(_alarmqt_unused_cli "${CMAKE_C_COMPILER}${CMAKE_EXPORT_NO_PACKAGE_REGISTRY}")
+unset(_alarmqt_unused_cli)
+
 # Source of truth: top-level VERSION (e.g. "0.1.0-dev"), or
 # -DPROJECT_VERSION_FULL=... from packaging (Nix may append .<revCount>+g<rev>).
 if(NOT DEFINED PROJECT_VERSION_FULL)
