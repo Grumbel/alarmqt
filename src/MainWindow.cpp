@@ -25,6 +25,7 @@
 #include <QBrush>
 #include <QColor>
 #include <QFont>
+#include <QStatusBar>
 #include <QLocalSocket>
 
 #include <algorithm>
@@ -146,9 +147,12 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &MainWindow::onRowDoubleClicked);
     connect(m_table, &QTableWidget::customContextMenuRequested, this, &MainWindow::onTableContextMenu);
 
+    // Footer: QStatusBar with size grip; permanent label for next-alarm line.
     m_status = new QLabel;
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(m_status);
+    m_status->setMinimumWidth(120);
+    statusBar()->addPermanentWidget(m_status, 1);
+    statusBar()->setSizeGripEnabled(true);
 
     new QShortcut(QKeySequence::New, this, [this]() {
         m_input->setFocus();
@@ -575,9 +579,14 @@ void MainWindow::refreshList() {
     updateClock();
 
     if (auto next = m_manager->nextAlarm()) {
-        const QDateTime local = next->triggerUtc.toLocalTime();
+        const QDateTime whenSrc = next->scheduledUtc.isValid() ? next->scheduledUtc
+                                                               : next->triggerUtc;
+        const QDateTime local = whenSrc.toLocalTime();
+        QString remaining = next->snoozed
+                                ? tr("snooze %1").arg(next->remainingString())
+                                : next->remainingString();
         m_status->setText(tr("Next: %1  (%2)  —  %3")
-                              .arg(next->remainingString(),
+                              .arg(remaining,
                                    local.toString(QStringLiteral("HH:mm:ss")),
                                    next->displayName()));
     } else {
