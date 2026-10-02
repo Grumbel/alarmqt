@@ -64,6 +64,16 @@ Installed files (via CMake / Nix):
 
 The app sets `QGuiApplication::setDesktopFileName("alarmqt")` so the tray and window match the desktop entry (icon, notifications, single-window hints).
 
+## Tests
+
+```bash
+cmake -B build -DALARMQT_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Nix builds run the same tests in the check phase.
+
 ## Manual
 
 After install: `man alarmqt`

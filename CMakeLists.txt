@@ -66,3 +66,23 @@ install(FILES share/metainfo/alarmqt.metainfo.xml
 install(FILES man/alarmqt.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
+
+option(ALARMQT_BUILD_TESTS "Build unit tests" ON)
+if(ALARMQT_BUILD_TESTS)
+  enable_testing()
+  find_package(Qt6 REQUIRED COMPONENTS Test)
+  add_executable(test_parser
+    tests/test_parser.cpp
+    src/Alarm.cpp
+    src/AlarmManager.cpp
+  )
+  target_include_directories(test_parser PRIVATE src)
+  target_link_libraries(test_parser PRIVATE
+    Qt6::Core
+    Qt6::Test
+  )
+  add_test(NAME parser COMMAND test_parser)
+  set_tests_properties(parser PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+  )
+endif()

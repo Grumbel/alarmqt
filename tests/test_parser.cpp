@@ -1,0 +1,142 @@
+// SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "AlarmManager.h"
+
+#include <QTest>
+#include <QTimeZone>
+
+class TestParser : public QObject {
+    Q_OBJECT
+private slots:
+    void relative_basic();
+    void relative_combined();
+    void relative_optional_in();
+    void absolute_time_only();
+    void absolute_full_date();
+    void notes_trailing_words();
+    void notes_comma();
+    void notes_parens_and_quotes();
+    void explicit_label_overrides_note();
+    void invalid_inputs();
+    void command_is_time_part_only();
+};
+
+static qint64 secsUntil(const Alarm& a) {
+    return QDateTime::currentDateTimeUtc().secsTo(a.triggerUtc);
+}
+
+void TestParser::relative_basic() {
+    auto a = AlarmManager::parse(QStringLiteral("in 5m"));
+    QVERIFY(a.has_value());
+    QVERIFY(a->label.isEmpty());
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    const qint64 s = secsUntil(*a);
+    QVERIFY2(s >= 4 * 60 && s <= 5 * 60 + 2, qPrintable(QString::number(s)));
+
+    auto b = AlarmManager::parse(QStringLiteral("30s"));
+    QVERIFY(b.has_value());
+    const qint64 sb = secsUntil(*b);
+    QVERIFY2(sb >= 28 && sb <= 32, qPrintable(QString::number(sb)));
+}
+
+void TestParser::relative_combined() {
+    auto a = AlarmManager::parse(QStringLiteral("in 1h30m"));
+    QVERIFY(a.has_value());
+    const qint64 s = secsUntil(*a);
+    QVERIFY2(s >= 89 * 60 && s <= 91 * 60, qPrintable(QString::number(s)));
+
+    auto b = AlarmManager::parse(QStringLiteral("in 1d"));
+    QVERIFY(b.has_value());
+    const qint64 sb = secsUntil(*b);
+    QVERIFY2(sb >= 23 * 3600 && sb <= 25 * 3600, qPrintable(QString::number(sb)));
+}
+
+void TestParser::relative_optional_in() {
+    auto a = AlarmManager::parse(QStringLiteral("2h"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("2h"));
+    const qint64 s = secsUntil(*a);
+    QVERIFY2(s >= 7190 && s <= 7210, qPrintable(QString::number(s)));
+}
+
+void TestParser::absolute_time_only() {
+    const QTime t(15, 10);
+    auto a = AlarmManager::parse(QStringLiteral("at 15:10"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("at 15:10"));
+    const QDateTime local = a->triggerUtc.toLocalTime();
+    QCOMPARE(local.time().hour(), 15);
+    QCOMPARE(local.time().minute(), 10);
+    QVERIFY(a->triggerUtc > QDateTime::currentDateTimeUtc().addSecs(-2));
+}
+
+void TestParser::absolute_full_date() {
+    auto a = AlarmManager::parse(QStringLiteral("at 2099-06-15 09:30"));
+    QVERIFY(a.has_value());
+    const QDateTime local = a->triggerUtc.toLocalTime();
+    QCOMPARE(local.date(), QDate(2099, 6, 15));
+    QCOMPARE(local.time().hour(), 9);
+    QCOMPARE(local.time().minute(), 30);
+}
+
+void TestParser::notes_trailing_words() {
+    auto a = AlarmManager::parse(QStringLiteral("in 5m kitchen"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QCOMPARE(a->label, QStringLiteral("kitchen"));
+
+    auto b = AlarmManager::parse(QStringLiteral("at 15:10 standup"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("at 15:10"));
+    QCOMPARE(b->label, QStringLiteral("standup"));
+}
+
+void TestParser::notes_comma() {
+    auto a = AlarmManager::parse(QStringLiteral("in 5s, tea"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5s"));
+    QCOMPARE(a->label, QStringLiteral("tea"));
+}
+
+void TestParser::notes_parens_and_quotes() {
+    auto a = AlarmManager::parse(QStringLiteral("in 5m (kitchen)"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QCOMPARE(a->label, QStringLiteral("kitchen"));
+
+    auto b = AlarmManager::parse(QStringLiteral("in 10m \"tea\""));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("in 10m"));
+    QCOMPARE(b->label, QStringLiteral("tea"));
+
+    auto c = AlarmManager::parse(QStringLiteral("in 1m 'oven'"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->label, QStringLiteral("oven"));
+}
+
+void TestParser::explicit_label_overrides_note() {
+    auto a = AlarmManager::parse(QStringLiteral("in 5m kitchen"), QStringLiteral("forced"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->label, QStringLiteral("forced"));
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+}
+
+void TestParser::invalid_inputs() {
+    QVERIFY(!AlarmManager::parse(QString()).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("   ")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("hello")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("at")).has_value());
+}
+
+void TestParser::command_is_time_part_only() {
+    auto a = AlarmManager::parse(QStringLiteral("in 2h30m, long walk outside"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 2h30m"));
+    QCOMPARE(a->label, QStringLiteral("long walk outside"));
+    QVERIFY(a->displayName() == a->label);
+}
+
+QTEST_MAIN(TestParser)
+#include "test_parser.moc"

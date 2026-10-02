@@ -55,7 +55,14 @@
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROJECT_VERSION_FULL=${version}"
+            "-DALARMQT_BUILD_TESTS=ON"
           ];
+
+          doCheck = true;
+          # QTest may touch GUI plugins; force offscreen.
+          preCheck = ''
+            export QT_QPA_PLATFORM=offscreen
+          '';
 
           meta = with lib; {
             description = "Keyboard-friendly system-tray alarm / reminder";

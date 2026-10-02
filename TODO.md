@@ -3,21 +3,27 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-013.1-version-scheme-071e920.bundle`
-- **Next bundle NNN:** 014
+- **Current tip:** HEAD of bundle `alarmqt-020.1-parser-tests-071e920.bundle`
+- **Next bundle NNN:** 021
 
 ## Status
 
-v0.1 feature set complete. Versioning uses top-level `VERSION` (`0.1.0-dev`).
+v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `nix build` check phase).
 
-## Optional later
+## Open
 
-- [ ] Mute / volume
-- [ ] Daily/weekly recurrence
-- [ ] Parser unit tests
+- [ ] **Recurring alarms** — daily / weekly (and maybe custom interval). Data model already has a `repeating` flag; needs UX (edit dialog + list status), schedule logic after ack/fire, and persistence of recurrence rule.
+- [ ] Mute / volume for notification sound
+- [ ] Shell completions (bash/zsh/fish)
+- [ ] `--list` reply protocol when talking to a running primary
+
+## Done recently
+
+- Parser unit tests (Qt Test)
+- Man page, friendly notes, verification fixes, VERSION scheme
 
 ## Handoff
 
 ```bash
-git pull /path/to/alarmqt-013.1-version-scheme-071e920.bundle HEAD
+git pull /path/to/alarmqt-020.1-parser-tests-071e920.bundle HEAD
 ```
