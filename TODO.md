@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD after QStatusBar footer (see latest bundle)
-- **Next bundle NNN:** 024
+- **Current tip:** HEAD after full-height notify strips (see latest bundle)
+- **Next bundle NNN:** 025
 
 ## Status
 
