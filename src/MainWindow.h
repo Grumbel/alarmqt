@@ -49,6 +49,7 @@ private:
     bool editAlarm(const QUuid& id);
 
     AlarmManager* m_manager;
+    QLabel* m_clockIcon = nullptr;
     QLabel* m_clock = nullptr;
     QTableWidget* m_table = nullptr;
     QLineEdit* m_input = nullptr;

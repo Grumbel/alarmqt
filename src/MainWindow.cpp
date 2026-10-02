@@ -67,15 +67,31 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     setCentralWidget(central);
     auto* layout = new QVBoxLayout(central);
 
-    // Prominent current time
+    // Prominent current time with app icon on the left
+    auto* clockRow = new QHBoxLayout;
+    clockRow->setSpacing(16);
+    clockRow->setContentsMargins(8, 4, 8, 4);
+
+    m_clockIcon = new QLabel;
+    m_clockIcon->setFixedSize(72, 72);
+    m_clockIcon->setAlignment(Qt::AlignCenter);
+    m_clockIcon->setScaledContents(false);
+    {
+        const QIcon icon(QStringLiteral(":/icons/alarm.svg"));
+        m_clockIcon->setPixmap(icon.pixmap(QSize(72, 72)));
+    }
+
     m_clock = new QLabel;
-    m_clock->setAlignment(Qt::AlignCenter);
+    m_clock->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     QFont clockFont = font();
     clockFont.setPointSize(clockFont.pointSize() + 14);
     clockFont.setBold(true);
     m_clock->setFont(clockFont);
-    m_clock->setStyleSheet(QStringLiteral("padding: 8px 4px;"));
-    layout->addWidget(m_clock);
+    m_clock->setStyleSheet(QStringLiteral("padding: 4px 0;"));
+
+    clockRow->addWidget(m_clockIcon, 0, Qt::AlignVCenter);
+    clockRow->addWidget(m_clock, 1, Qt::AlignVCenter);
+    layout->addLayout(clockRow);
     updateClock();
 
     auto* inputRow = new QHBoxLayout;
