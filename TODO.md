@@ -4,7 +4,7 @@
 
 - **Work-line base:** `071e920` (Initial checkin)
 - **Current tip:** HEAD after full-height notify strips (see latest bundle)
-- **Next bundle NNN:** 028
+- **Next bundle NNN:** 029
 
 ## Status
 
@@ -18,6 +18,7 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Man page / README: D-Bus + busctl examples
 - Session D-Bus API (`org.alarmqt.AlarmQt` / `/org/alarmqt/AlarmQt`)
 - `--list` reply protocol (secondary prints primary's alarm list)
 - Missed alarms, SNOOZED status, notification blink redesign, row blink

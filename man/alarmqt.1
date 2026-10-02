@@ -19,8 +19,8 @@ Alarms keep notifying (dialog, tray message, and sound) until they are
 acknowledged or snoozed.
 .PP
 Only one instance runs at a time.
-A second invocation forwards the command line to the running process
-(raise the window, add an alarm, quit, and so on).
+A second invocation talks to the running process over the session D-Bus
+(raise the window, add an alarm, list, quit, and so on).
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
@@ -35,9 +35,9 @@ If none is running, exit successfully without starting the GUI.
 .TP
 .BR \-l ", " \-\-list
 List alarms.
-If no instance is running, print the list and exit without starting the GUI.
-If an instance is running, the request is forwarded (the second process does
-not print the list).
+If no instance is running, print the stored list and exit without starting
+the GUI.
+If an instance is running, query it over D-Bus and print the reply.
 .TP
 .BR \-r ", " \-\-raise
 Raise the existing main window.
@@ -92,6 +92,55 @@ Hide the main window to the tray; in the notification dialog, snooze 5 minutes.
 .TP
 .B Enter / Space
 Acknowledge in the notification dialog.
+.SH D-BUS
+The primary instance owns a well-known name on the session bus.
+Scripting and debugging can use
+.B busctl
+(or any D-Bus client) instead of the CLI.
+.PP
+.TS
+l l.
+Service	org.alarmqt.AlarmQt
+Object path	/org/alarmqt/AlarmQt
+Interface	org.alarmqt.AlarmQt
+.TE
+.PP
+Methods:
+.TP
+.B List
+Return a multiline string (same format as
+.BR \-\-list ).
+.TP
+.B ListLines
+Return one formatted line per alarm as a string array.
+.TP
+.B Add \fIexpression\fR
+Parse and add an alarm.
+Returns an empty string on success, or an error message.
+.TP
+.B Raise
+Show and activate the main window.
+.TP
+.B Quit
+Exit the primary instance.
+.TP
+.B ClearDone
+Remove all acknowledged alarms; returns how many were removed.
+.TP
+.B Version
+Return the application version string.
+.PP
+Examples:
+.PP
+.RS
+.nf
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt List
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt ListLines
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Add s \(dqin 5m tea\(dq
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Raise
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Quit
+.fi
+.RE
 .SH FILES
 .TP
 .I ~/.local/share/Grumbel/alarmqt/alarms.json
@@ -106,7 +155,8 @@ and application
 Success.
 .TP
 .B 1
-Could not parse an alarm expression given on the command line.
+Could not parse an alarm expression given on the command line,
+or a D-Bus call to the primary instance failed.
 .SH EXAMPLES
 .TP
 Start or raise the app:
@@ -124,11 +174,12 @@ Add an absolute alarm:
 .B alarmqt \(dqat 15:10\(dq
 .RE
 .TP
-List alarms without opening the GUI (when idle):
+List alarms (local store or via D-Bus if a primary is running):
 .RS
 .B alarmqt \-\-list
 .RE
 .SH SEE ALSO
+.BR busctl (1),
 .UR https://github.com/Grumbel/alarmqt
 .UE
 .SH AUTHOR

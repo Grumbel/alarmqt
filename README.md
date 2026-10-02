@@ -48,6 +48,10 @@ alarmqt --list
 alarmqt --quit
 ```
 
+A second process talks to the running instance over the session D-Bus
+(`org.alarmqt.AlarmQt`). For scripting, prefer `busctl` (see `man alarmqt`);
+the CLI does not mirror every method as a flag.
+
 ## Dependencies
 
 - Qt6 (Core, Gui, Widgets, Network for local socket, Svg, Multimedia for the alarm sound)
