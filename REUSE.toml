@@ -3,12 +3,16 @@ version = 1
 [[annotations]]
 path = [
   "src/**",
+  "tests/**",
   "CMakeLists.txt",
+  "VERSION",
   "flake.nix",
+  "flake.lock",
   "resources.qrc",
   "share/**",
   "man/**",
   "icons/**",
+  "sounds/**",
   "README.md",
   "AGENTS.md",
   "TODO.md",
