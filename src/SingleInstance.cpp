@@ -4,7 +4,6 @@
 #include "SingleInstance.h"
 
 #include <QLocalSocket>
-#include <QDataStream>
 
 SingleInstance::SingleInstance(const QString& key, QObject* parent)
     : QObject(parent)
@@ -22,7 +21,6 @@ SingleInstance::SingleInstance(const QString& key, QObject* parent)
     QLocalServer::removeServer(m_key);
     m_server = new QLocalServer(this);
     if (!m_server->listen(m_key)) {
-        // fallback: still claim primary
         m_isPrimary = true;
         return;
     }
@@ -37,25 +35,39 @@ SingleInstance::~SingleInstance() {
 
 void SingleInstance::onNewConnection() {
     while (auto* sock = m_server->nextPendingConnection()) {
-        connect(sock, &QLocalSocket::readyRead, this, [this, sock]() {
+        // Helper: secondary may write and close before readyRead is connected.
+        auto consume = [this, sock]() {
             const QByteArray data = sock->readAll();
-            const QString msg = QString::fromUtf8(data);
-            emit messageReceived(msg);
+            if (data.isEmpty())
+                return;
+            emit messageReceived(QString::fromUtf8(data).trimmed());
             sock->disconnectFromServer();
             sock->deleteLater();
-        });
+        };
+
+        connect(sock, &QLocalSocket::readyRead, this, consume);
         connect(sock, &QLocalSocket::disconnected, sock, &QLocalSocket::deleteLater);
+
+        // Data may already be buffered
+        if (sock->bytesAvailable() > 0)
+            consume();
     }
 }
 
 bool SingleInstance::sendMessage(const QString& key, const QString& message) {
     QLocalSocket socket;
     socket.connectToServer(key);
-    if (!socket.waitForConnected(500))
+    if (!socket.waitForConnected(1000))
         return false;
-    socket.write(message.toUtf8());
+    const QByteArray payload = message.toUtf8();
+    if (socket.write(payload) != payload.size())
+        return false;
     socket.flush();
-    socket.waitForBytesWritten(500);
+    socket.waitForBytesWritten(1000);
+    // Give the server a moment to read before we tear down the socket
+    socket.waitForDisconnected(200);
     socket.disconnectFromServer();
+    if (socket.state() != QLocalSocket::UnconnectedState)
+        socket.waitForDisconnected(200);
     return true;
 }

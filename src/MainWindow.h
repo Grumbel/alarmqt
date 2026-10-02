@@ -8,7 +8,7 @@
 
 #include <QMainWindow>
 #include <QSystemTrayIcon>
-#include <QListWidget>
+#include <QTableWidget>
 #include <QLineEdit>
 #include <QLabel>
 #include <QHash>
@@ -42,11 +42,11 @@ private:
     void showNotification(const Alarm& a);
 
     AlarmManager* m_manager;
-    QListWidget* m_list = nullptr;
+    QTableWidget* m_table = nullptr;
     QLineEdit* m_input = nullptr;
     QLabel* m_status = nullptr;
     QSystemTrayIcon* m_tray = nullptr;
     QHash<QUuid, NotificationDialog*> m_dialogs;
-    QSet<QUuid> m_activeTriggered; // ids currently needing attention
+    QSet<QUuid> m_activeTriggered;
     QTimer m_renotifyTimer;
 };

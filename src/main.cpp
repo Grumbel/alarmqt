@@ -22,7 +22,6 @@ int main(int argc, char* argv[]) {
     QApplication::setDesktopFileName(QStringLiteral("alarmqt"));
     QApplication::setQuitOnLastWindowClosed(false); // tray keeps us alive
 
-    // Application / window icon (tray uses the same resource)
     const QIcon appIcon(QStringLiteral(":/icons/alarm.svg"));
     QApplication::setWindowIcon(appIcon);
 
@@ -54,15 +53,16 @@ int main(int argc, char* argv[]) {
     SingleInstance instance(kAppKey);
 
     if (!instance.isPrimary()) {
-        // Secondary: forward and exit
         if (SingleInstance::sendMessage(kAppKey, message)) {
             if (message == QLatin1String("--list")) {
-                // can't easily get reply; just inform
-                std::cout << "Sent --list to primary instance (see its window / logs)\n";
+                std::cout << "Sent --list to primary instance\n";
+            } else if (message != QLatin1String("--raise")
+                       && message != QLatin1String("--quit")) {
+                std::cout << "Sent alarm to running instance: "
+                          << message.toStdString() << "\n";
             }
             return 0;
         }
-        // Could not contact primary – fall through and become primary? rare race
         qWarning("Could not contact primary instance, starting anyway");
     }
 
@@ -72,14 +72,24 @@ int main(int argc, char* argv[]) {
     QObject::connect(&instance, &SingleInstance::messageReceived,
                      &window, &MainWindow::handleExternalCommand);
 
-    // If started with an alarm expression, add it
-    if (!pos.isEmpty() && message != QLatin1String("--raise")
-        && message != QLatin1String("--quit") && message != QLatin1String("--list")) {
-        auto opt = AlarmManager::parse(message);
-        if (opt)
+    // Cold-start with an alarm expression on the command line
+    if (!pos.isEmpty()
+        && !parser.isSet(QStringLiteral("quit"))
+        && !parser.isSet(QStringLiteral("list"))
+        && !parser.isSet(QStringLiteral("raise"))) {
+        const QString expr = pos.join(QLatin1Char(' '));
+        auto opt = AlarmManager::parse(expr);
+        if (opt) {
             manager.add(*opt);
-        else
-            qWarning() << "Could not parse alarm:" << message;
+            const auto local = opt->triggerUtc.toLocalTime();
+            std::cout << "Alarm added: " << opt->label.toStdString()
+                      << "  at " << local.toString(Qt::ISODate).toStdString()
+                      << "  (in " << opt->remainingString().toStdString() << ")\n";
+        } else {
+            std::cerr << "Could not parse alarm: " << expr.toStdString() << "\n"
+                      << "Examples: in 5m | in 2h30m | at 15:10 | at 2026-10-03 09:00\n";
+            return 1;
+        }
     }
 
     if (parser.isSet(QStringLiteral("list"))) {

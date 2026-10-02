@@ -5,6 +5,7 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QHeaderView>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMessageBox>
@@ -12,9 +13,26 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QShortcut>
-#include <QStyle>
 #include <QIcon>
 #include <QTimeZone>
+#include <QTableWidgetItem>
+#include <QBrush>
+#include <QColor>
+
+namespace {
+constexpr int kColRemaining = 0;
+constexpr int kColWhen = 1;
+constexpr int kColLabel = 2;
+constexpr int kRoleId = Qt::UserRole;
+
+QColor rowBackground(const Alarm& a) {
+    if (a.triggered)
+        return QColor(0xfc, 0x81, 0x81, 0x55); // soft red
+    if (a.remainingMs() < 60'000)
+        return QColor(0xf6, 0xe0, 0x5e, 0x55); // soft yellow
+    return QColor(); // default
+}
+} // namespace
 
 MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     : QMainWindow(parent)
@@ -22,14 +40,13 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
 {
     setWindowTitle(tr("AlarmQt"));
     setWindowIcon(QIcon(QStringLiteral(":/icons/alarm.svg")));
-    setMinimumSize(420, 320);
-    resize(480, 400);
+    setMinimumSize(480, 320);
+    resize(560, 400);
 
     auto* central = new QWidget(this);
     setCentralWidget(central);
     auto* layout = new QVBoxLayout(central);
 
-    // Input row
     auto* inputRow = new QHBoxLayout;
     m_input = new QLineEdit;
     m_input->setPlaceholderText(tr("in 5m  ·  at 15:10  ·  at 2026-10-03 09:00"));
@@ -42,18 +59,25 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     connect(m_input, &QLineEdit::returnPressed, this, &MainWindow::addFromInput);
     connect(addBtn, &QPushButton::clicked, this, &MainWindow::addFromInput);
 
-    // List
-    m_list = new QListWidget;
-    m_list->setAlternatingRowColors(true);
-    m_list->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    layout->addWidget(m_list, 1);
+    m_table = new QTableWidget(0, 3);
+    m_table->setHorizontalHeaderLabels({tr("Remaining"), tr("When"), tr("Label")});
+    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_table->setAlternatingRowColors(true);
+    m_table->verticalHeader()->setVisible(false);
+    m_table->horizontalHeader()->setStretchLastSection(true);
+    m_table->horizontalHeader()->setSectionResizeMode(kColRemaining, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(kColWhen, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(kColLabel, QHeaderView::Stretch);
+    m_table->setShowGrid(false);
+    m_table->setFocusPolicy(Qt::StrongFocus);
+    layout->addWidget(m_table, 1);
 
-    // Status
     m_status = new QLabel;
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_status);
 
-    // Shortcuts
     new QShortcut(QKeySequence::New, this, [this]() {
         m_input->setFocus();
         m_input->selectAll();
@@ -70,14 +94,12 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
             d->deleteLater();
     });
 
-    // Re-notify every 30 s while any alarm is still triggered / unacked
     m_renotifyTimer.setInterval(30'000);
     connect(&m_renotifyTimer, &QTimer::timeout, this, &MainWindow::renotifyTriggered);
     m_renotifyTimer.start();
 
     createTray();
     refreshList();
-
     m_input->setFocus();
 }
 
@@ -156,9 +178,14 @@ void MainWindow::addFromInput() {
 }
 
 void MainWindow::removeSelected() {
-    const auto items = m_list->selectedItems();
-    for (QListWidgetItem* item : items) {
-        const QUuid id = item->data(Qt::UserRole).toUuid();
+    const auto ranges = m_table->selectionModel()->selectedRows();
+    QList<QUuid> ids;
+    for (const QModelIndex& idx : ranges) {
+        auto* item = m_table->item(idx.row(), kColRemaining);
+        if (item)
+            ids.append(item->data(kRoleId).toUuid());
+    }
+    for (const QUuid& id : ids) {
         m_manager->remove(id);
         m_activeTriggered.remove(id);
         if (auto* d = m_dialogs.take(id))
@@ -168,31 +195,44 @@ void MainWindow::removeSelected() {
 
 void MainWindow::refreshList() {
     QSet<QUuid> selected;
-    for (QListWidgetItem* item : m_list->selectedItems())
-        selected.insert(item->data(Qt::UserRole).toUuid());
+    for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
+        if (auto* item = m_table->item(idx.row(), kColRemaining))
+            selected.insert(item->data(kRoleId).toUuid());
+    }
 
-    m_list->clear();
+    m_table->setRowCount(0);
 
+    int row = 0;
     for (const auto& a : m_manager->alarms()) {
         if (a.acknowledged)
             continue;
 
-        const QDateTime local = a.triggerUtc.toLocalTime();
-        const QString text = QStringLiteral("%1    →  %2    (%3)")
-                                 .arg(a.remainingString(),
-                                      local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")),
-                                      a.label);
+        m_table->insertRow(row);
 
-        auto* item = new QListWidgetItem(text);
-        item->setData(Qt::UserRole, a.id);
-        if (a.triggered)
-            item->setForeground(QColor(QStringLiteral("#fc8181")));
-        else if (a.remainingMs() < 60'000)
-            item->setForeground(QColor(QStringLiteral("#f6e05e")));
-        m_list->addItem(item);
+        const QDateTime local = a.triggerUtc.toLocalTime();
+        auto* remaining = new QTableWidgetItem(a.remainingString());
+        auto* when = new QTableWidgetItem(
+            local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+        auto* label = new QTableWidgetItem(a.label);
+
+        remaining->setData(kRoleId, a.id);
+        remaining->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+        const QColor bg = rowBackground(a);
+        for (QTableWidgetItem* item : {remaining, when, label}) {
+            if (bg.isValid())
+                item->setBackground(bg);
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        }
+
+        m_table->setItem(row, kColRemaining, remaining);
+        m_table->setItem(row, kColWhen, when);
+        m_table->setItem(row, kColLabel, label);
 
         if (selected.contains(a.id))
-            item->setSelected(true);
+            m_table->selectRow(row);
+
+        ++row;
     }
 
     updateTray();
@@ -227,7 +267,7 @@ void MainWindow::renotifyTriggered() {
     if (m_activeTriggered.isEmpty())
         return;
 
-    for (const QUuid& id : m_activeTriggered) {
+    for (const QUuid& id : std::as_const(m_activeTriggered)) {
         const Alarm* a = m_manager->alarmById(id);
         if (!a || a->acknowledged) {
             m_activeTriggered.remove(id);
@@ -265,19 +305,20 @@ void MainWindow::showNotification(const Alarm& a) {
 }
 
 void MainWindow::handleExternalCommand(const QString& cmd) {
-    if (cmd == QLatin1String("--raise") || cmd.isEmpty()) {
+    const QString c = cmd.trimmed();
+    if (c == QLatin1String("--raise") || c.isEmpty()) {
         raiseAndActivate();
         return;
     }
-    if (cmd == QLatin1String("--quit")) {
+    if (c == QLatin1String("--quit")) {
         qApp->quit();
         return;
     }
-    if (cmd == QLatin1String("--list")) {
+    if (c == QLatin1String("--list")) {
         return;
     }
 
-    auto opt = AlarmManager::parse(cmd);
+    auto opt = AlarmManager::parse(c);
     if (opt) {
         m_manager->add(*opt);
         raiseAndActivate();
@@ -285,7 +326,7 @@ void MainWindow::handleExternalCommand(const QString& cmd) {
                             QSystemTrayIcon::Information, 3'000);
     } else {
         m_tray->showMessage(tr("Parse error"),
-                            tr("Could not parse: %1").arg(cmd),
+                            tr("Could not parse: %1").arg(c),
                             QSystemTrayIcon::Warning, 5'000);
     }
 }

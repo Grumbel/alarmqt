@@ -37,8 +37,9 @@ Alarm* AlarmManager::alarmById(const QUuid& id) {
 
 static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     // Matches: in 5m, in 2h30m, in 1d 2h, 5 minutes, etc.
+    // Require at least one duration unit; anchor full string.
     static const QRegularExpression re(
-        R"((?:in\s+)?(?:(\d+)\s*d(?:ays?)?)?\s*(?:(\d+)\s*h(?:ours?)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?\s*(?:(\d+)\s*s(?:ec(?:onds?)?)?)?)",
+        R"(\A(?:in\s+)?(?:(\d+)\s*d(?:ays?)?)?\s*(?:(\d+)\s*h(?:ours?)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?\s*(?:(\d+)\s*s(?:ec(?:onds?)?)?)?\s*\z)",
         QRegularExpression::CaseInsensitiveOption);
 
     auto m = re.match(s.trimmed());
