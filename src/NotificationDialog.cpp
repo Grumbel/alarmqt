@@ -19,11 +19,11 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
 {
     setWindowTitle(tr("Alarm – %1").arg(alarm.displayName()));
     setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint);
+    setAttribute(Qt::WA_DeleteOnClose);
     setModal(false);
     setMinimumWidth(420);
     setMinimumHeight(160);
 
-    // Stable, readable chrome (no full-window colour flash)
     setStyleSheet(QStringLiteral(
         "QDialog { background-color: #1a202c; color: #f7fafc; }"
         "QLabel { color: #f7fafc; background: transparent; }"
@@ -95,8 +95,11 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     m_sound = new QSoundEffect(this);
     m_sound->setSource(QUrl(QStringLiteral("qrc:/sounds/alarm.wav")));
     m_sound->setVolume(0.9);
+    m_sound->setLoopCount(1);
 
     connect(&m_blinkTimer, &QTimer::timeout, this, [this]() {
+        if (m_closing)
+            return;
         m_blinkOn = !m_blinkOn;
         setBlinkOn(m_blinkOn);
         if (m_blinkOn)
@@ -116,7 +119,22 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     activateWindow();
 }
 
-NotificationDialog::~NotificationDialog() = default;
+NotificationDialog::~NotificationDialog() {
+    stopAlert();
+}
+
+void NotificationDialog::stopAlert() {
+    m_closing = true;
+    m_blinkTimer.stop();
+    if (m_sound) {
+        m_sound->stop();
+    }
+}
+
+void NotificationDialog::done(int r) {
+    stopAlert();
+    QDialog::done(r);
+}
 
 void NotificationDialog::setBlinkOn(bool on) {
     const char* style = on
@@ -127,6 +145,8 @@ void NotificationDialog::setBlinkOn(bool on) {
 }
 
 void NotificationDialog::playSound() {
+    if (m_closing)
+        return;
     if (m_sound && m_sound->status() != QSoundEffect::Error) {
         m_sound->play();
         return;
@@ -150,6 +170,10 @@ void NotificationDialog::keyPressEvent(QKeyEvent* event) {
 }
 
 void NotificationDialog::closeEvent(QCloseEvent* event) {
-    emit snoozed(m_alarm.id, 5);
+    if (!m_closing) {
+        // Window manager close → treat as snooze (same as before)
+        emit snoozed(m_alarm.id, 5);
+    }
+    stopAlert();
     event->accept();
 }

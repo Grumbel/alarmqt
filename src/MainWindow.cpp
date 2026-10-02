@@ -505,6 +505,7 @@ void MainWindow::showNotification(const Alarm& a) {
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {
         m_manager->acknowledge(id);
         m_activeTriggered.remove(id);
+        // Dialog has WA_DeleteOnClose; only drop our pointer
         m_dialogs.remove(id);
     });
     connect(dlg, &NotificationDialog::snoozed, this, [this](const QUuid& id, int mins) {

@@ -29,10 +29,12 @@ signals:
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
+    void done(int r) override;
 
 private:
     void setBlinkOn(bool on);
     void playSound();
+    void stopAlert();
 
     Alarm m_alarm;
     QLabel* m_title = nullptr;
@@ -41,5 +43,6 @@ private:
     QFrame* m_rightBlink = nullptr;
     QTimer m_blinkTimer;
     bool m_blinkOn = false;
+    bool m_closing = false;
     QSoundEffect* m_sound = nullptr;
 };
