@@ -42,5 +42,5 @@ install(FILES icons/alarm.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
         RENAME alarmqt.svg)
 
-install(FILES share/metainfo/com.github.grumbel.alarmqt.metainfo.xml
+install(FILES share/metainfo/alarmqt.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)

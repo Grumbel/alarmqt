@@ -51,7 +51,7 @@ Installed files (via CMake / Nix):
 
 - `share/applications/alarmqt.desktop`
 - `share/icons/hicolor/scalable/apps/alarmqt.svg`
-- `share/metainfo/com.github.grumbel.alarmqt.metainfo.xml`
+- `share/metainfo/alarmqt.metainfo.xml`
 
 The app sets `QGuiApplication::setDesktopFileName("alarmqt")` so the tray and window match the desktop entry (icon, notifications, single-window hints).
 

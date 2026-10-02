@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QApplication::setOrganizationName(QStringLiteral("Grumbel"));
-    QApplication::setOrganizationDomain(QStringLiteral("github.com.grumbel"));
+    QApplication::setOrganizationDomain(QStringLiteral("alarmqt"));
     QApplication::setDesktopFileName(QStringLiteral("alarmqt"));
     QApplication::setQuitOnLastWindowClosed(false); // tray keeps us alive
 
