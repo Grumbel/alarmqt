@@ -59,4 +59,6 @@ private:
     QHash<QUuid, NotificationDialog*> m_dialogs;
     QSet<QUuid> m_activeTriggered;
     QTimer m_renotifyTimer;
+    QTimer m_rowBlinkTimer;
+    bool m_rowBlinkOn = false;
 };

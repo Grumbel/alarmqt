@@ -39,8 +39,12 @@ constexpr int kRoleId = Qt::UserRole;
 QColor rowBackground(const Alarm& a) {
     if (a.acknowledged)
         return QColor(0x68, 0xd3, 0x91, 0x40); // soft green DONE
+    if (a.missed)
+        return QColor(0x9b, 0x2c, 0x2c, 0x55); // deep red MISSED
     if (a.triggered)
-        return QColor(0xfc, 0x81, 0x81, 0x55); // soft red
+        return QColor(0xfc, 0x81, 0x81, 0x55); // soft red DUE
+    if (a.snoozed)
+        return QColor(0x63, 0xb3, 0xed, 0x40); // soft blue SNOOZED
     if (a.remainingMs() < 60'000)
         return QColor(0xf6, 0xe0, 0x5e, 0x55); // soft yellow
     return QColor();
@@ -49,8 +53,12 @@ QColor rowBackground(const Alarm& a) {
 QString statusText(const Alarm& a) {
     if (a.acknowledged)
         return QStringLiteral("DONE");
+    if (a.missed)
+        return QStringLiteral("MISSED");
     if (a.triggered)
         return QStringLiteral("DUE");
+    if (a.snoozed)
+        return QStringLiteral("SNOOZED");
     return QStringLiteral("ACTIVE");
 }
 } // namespace
@@ -168,6 +176,15 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_renotifyTimer.setInterval(30'000);
     connect(&m_renotifyTimer, &QTimer::timeout, this, &MainWindow::renotifyTriggered);
     m_renotifyTimer.start();
+
+    m_rowBlinkTimer.setInterval(250);
+    connect(&m_rowBlinkTimer, &QTimer::timeout, this, [this]() {
+        if (m_activeTriggered.isEmpty())
+            return;
+        m_rowBlinkOn = !m_rowBlinkOn;
+        refreshList();
+    });
+    m_rowBlinkTimer.start();
 
     createTray();
     refreshList();
@@ -378,7 +395,8 @@ bool MainWindow::editAlarm(const QUuid& id) {
     commandEdit->setPlaceholderText(tr("in 5m  ·  at 15:10"));
     auto* labelEdit = new QLineEdit(a->label);
     labelEdit->setPlaceholderText(tr("optional note"));
-    auto* whenEdit = new QDateTimeEdit(a->triggerUtc.toLocalTime());
+    const QDateTime editWhen = a->scheduledUtc.isValid() ? a->scheduledUtc : a->triggerUtc;
+    auto* whenEdit = new QDateTimeEdit(editWhen.toLocalTime());
     whenEdit->setCalendarPopup(true);
     whenEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
     whenEdit->setTimeZone(QTimeZone::systemTimeZone());
@@ -446,6 +464,9 @@ bool MainWindow::editAlarm(const QUuid& id) {
     updated.acknowledged = doneCheck->isChecked();
     // Re-arm; if the new time is already past, the next tick fires it again.
     updated.triggered = false;
+    updated.scheduledUtc = updated.triggerUtc;
+    updated.snoozed = false;
+    updated.missed = false;
 
     m_manager->update(updated);
     // Any open notification belongs to the old schedule.
@@ -506,17 +527,34 @@ void MainWindow::refreshList() {
     QItemSelection restoreSelection;
     for (int row = 0; row < ordered.size(); ++row) {
         const Alarm& a = *ordered[row];
-        const QDateTime local = a.triggerUtc.toLocalTime();
 
         auto* status = setCell(row, kColStatus, statusText(a));
         status->setData(kRoleId, a.id);
-        setCell(row, kColRemaining,
-                a.acknowledged ? QStringLiteral("—") : a.remainingString());
-        setCell(row, kColWhen, local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+
+        QString remaining;
+        if (a.acknowledged) {
+            remaining = QStringLiteral("—");
+        } else if (a.snoozed) {
+            remaining = tr("snooze %1").arg(a.remainingString());
+        } else {
+            remaining = a.remainingString();
+        }
+        setCell(row, kColRemaining, remaining);
+
+        // "When" is the real scheduled time; snooze only moves triggerUtc.
+        const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
+        setCell(row, kColWhen, whenSrc.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
         setCell(row, kColCommand, a.command);
         setCell(row, kColLabel, a.label.isEmpty() ? QStringLiteral("—") : a.label);
 
-        const QColor bg = rowBackground(a);
+        // Row blink for open notifications overrides static status colour.
+        QColor bg;
+        if (m_activeTriggered.contains(a.id)) {
+            bg = m_rowBlinkOn ? QColor(0xe5, 0x3e, 0x3e, 0x90)
+                              : QColor(0x00, 0x00, 0x00, 0x70);
+        } else {
+            bg = rowBackground(a);
+        }
         for (int col = 0; col < m_table->columnCount(); ++col)
             m_table->item(row, col)->setBackground(bg.isValid() ? QBrush(bg) : QBrush());
 
