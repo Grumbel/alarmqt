@@ -95,7 +95,7 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
     if (!dt.isValid())
         dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-ddTHH:mm"));
 
-    // Time only: 15:10 or 15:10:00 → today, or tomorrow if already passed
+    // Time only (24h): 15:10 or 15:10:00 → today, or tomorrow if already passed
     if (!dt.isValid()) {
         QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
         if (!time.isValid())
@@ -104,6 +104,34 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
             dt = QDateTime(nowLocal.date(), time, nowLocal.timeZone());
             if (dt <= nowLocal)
                 dt = dt.addDays(1);
+        }
+    }
+
+    // American 12-hour: 6:00am, 6:00 pm, 6am, 6 PM, 12:00am/pm
+    if (!dt.isValid()) {
+        QString norm = t;
+        norm.replace(QLatin1Char('.'), QString());
+        // After stripping dots, pattern is 6:00am / 6am / 6:00pm
+        static const QRegularExpression amPmReFlat(
+            R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap])m\z)",
+            QRegularExpression::CaseInsensitiveOption);
+        if (auto m = amPmReFlat.match(norm.trimmed()); m.hasMatch()) {
+            int hour = m.captured(1).toInt();
+            const int minute = m.captured(2).isEmpty() ? 0 : m.captured(2).toInt();
+            const int second = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
+            const bool pm = m.captured(4).compare(QLatin1String("p"), Qt::CaseInsensitive) == 0;
+            if (hour >= 1 && hour <= 12 && minute <= 59 && second <= 59) {
+                if (pm && hour < 12)
+                    hour += 12;
+                else if (!pm && hour == 12)
+                    hour = 0;
+                const QTime time(hour, minute, second);
+                if (time.isValid()) {
+                    dt = QDateTime(nowLocal.date(), time, nowLocal.timeZone());
+                    if (dt <= nowLocal)
+                        dt = dt.addDays(1);
+                }
+            }
         }
     }
 
@@ -169,7 +197,7 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
 
     // 4) Absolute time prefix + trailing words: "at 15:10 meeting" / "15:10 tea"
     static const QRegularExpression absPrefix(
-        R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)))",
+        R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)))",
         QRegularExpression::CaseInsensitiveOption);
     if (auto am = absPrefix.match(trimmed); am.hasMatch()) {
         const QString prefix = am.captured(1).trimmed();

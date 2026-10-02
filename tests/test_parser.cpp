@@ -15,6 +15,7 @@ private slots:
     void relative_unit_spellings();
     void absolute_time_only();
     void absolute_full_date();
+    void absolute_american_ampm();
     void notes_trailing_words();
     void notes_comma();
     void notes_parens_and_quotes();

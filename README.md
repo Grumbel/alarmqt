@@ -6,7 +6,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 
 - **Relative & absolute alarms**
   - `in 5m`, `in 2h30m`, `in 1d`, `in 10 mins`, `in 2 hours`
-  - `at 15:10`, `at 2026-10-03 09:00`
+  - `at 15:10`, `at 2026-10-03 09:00`, `6:00pm`, `6am`
   - optional note: `in 5m kitchen`, `in 5m, tea`, `at 15:10 standup`
     (also still accepts `(kitchen)` / `"tea"`)
 - **Timezone-aware** (uses local timezone by default; stores absolute UTC instants)
