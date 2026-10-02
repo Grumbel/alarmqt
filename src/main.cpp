@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
     if (!busOk)
         qWarning("No D-Bus session bus; single-instance and remote CLI disabled");
 
-    // Own alarmqt.app → we are primary. Failure → another instance holds the name.
+    // Own org.alarmqt.AlarmQt → we are primary. Failure → another instance holds the name.
     const bool isPrimary = !busOk
         || bus.registerService(QLatin1String(AlarmDBus::serviceName()));
 

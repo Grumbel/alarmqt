@@ -4,7 +4,7 @@
 
 - **Work-line base:** `071e920` (Initial checkin)
 - **Current tip:** HEAD after full-height notify strips (see latest bundle)
-- **Next bundle NNN:** 027
+- **Next bundle NNN:** 028
 
 ## Status
 
@@ -18,7 +18,7 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
-- Session D-Bus API (`alarmqt.app` / `/alarmqt` / `alarmqt.App`)
+- Session D-Bus API (`org.alarmqt.AlarmQt` / `/org/alarmqt/AlarmQt`)
 - `--list` reply protocol (secondary prints primary's alarm list)
 - Missed alarms, SNOOZED status, notification blink redesign, row blink
 - Parser unit tests (Qt Test) + American 12-hour coverage

@@ -14,19 +14,19 @@ class MainWindow;
 /**
  * Session-bus API for AlarmQt.
  *
- * D-Bus well-known names must contain a '.' — we use a short id, not reverse DNS:
- *   service:   alarmqt.app
- *   path:      /alarmqt
- *   interface: alarmqt.App
+ * Session-bus identity (desktop-style, no real domain required):
+ *   service:   org.alarmqt.AlarmQt
+ *   path:      /org/alarmqt/AlarmQt
+ *   interface: org.alarmqt.AlarmQt
  */
 class AlarmDBus : public QObject {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "alarmqt.App")
+    Q_CLASSINFO("D-Bus Interface", "org.alarmqt.AlarmQt")
 
 public:
-    static constexpr const char* serviceName() { return "alarmqt.app"; }
-    static constexpr const char* objectPath() { return "/alarmqt"; }
-    static constexpr const char* interfaceName() { return "alarmqt.App"; }
+    static constexpr const char* serviceName() { return "org.alarmqt.AlarmQt"; }
+    static constexpr const char* objectPath() { return "/org/alarmqt/AlarmQt"; }
+    static constexpr const char* interfaceName() { return "org.alarmqt.AlarmQt"; }
 
     explicit AlarmDBus(AlarmManager* manager, MainWindow* window = nullptr,
                        QObject* parent = nullptr);
