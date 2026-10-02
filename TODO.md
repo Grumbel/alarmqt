@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-002.2-continuity-renotify-071e920.bundle`
-- **Next bundle NNN:** 003
+- **Current tip:** HEAD of bundle `alarmqt-003.1-fix-qshortcut-qt611-071e920.bundle`
+- **Next bundle NNN:** 004
 
 ## Done in this line
 
@@ -14,6 +14,7 @@
 - Re-notify loop while alarm is triggered and unacknowledged
 - Prune acknowledged alarms on load/save
 - flake homepage + README wording
+- Fix QShortcut compile error on Qt 6.11 (member ptr → lambda)
 
 ## Open / nice-to-have
 
@@ -24,7 +25,7 @@
 - [ ] `--list` should print from primary via reply protocol (currently secondary only hints)
 - [ ] Unit tests for the time parser
 - [ ] Install icon/desktop file paths verified under Nix
-- [ ] Confirm build on NixOS (agent sandbox had no `nix` / Qt)
+- [ ] Confirm full build still green after Qt 6.11 fix (user was mid-build)
 
 ## Known limitations
 
@@ -34,8 +35,8 @@
 
 ## Handoff
 
-Anyone continuing: read `AGENTS.md`, this file, then `git log`. Apply the latest `alarmqt-NNN.*.bundle` from artifacts if not already at tip:
-
 ```bash
-git pull /path/to/alarmqt-002.2-continuity-renotify-071e920.bundle HEAD
+git pull /path/to/alarmqt-003.1-fix-qshortcut-qt611-071e920.bundle HEAD
 ```
+
+Requires base `071e920`. Read `AGENTS.md` and this file.
