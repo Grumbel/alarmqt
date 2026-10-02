@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         if (opt) {
             manager.add(*opt);
             const auto local = opt->triggerUtc.toLocalTime();
-            std::cout << "Alarm added: " << opt->label.toStdString()
+            std::cout << "Alarm added: " << opt->displayName().toStdString()
                       << "  at " << local.toString(Qt::ISODate).toStdString()
                       << "  (in " << opt->remainingString().toStdString() << ")\n";
         } else {
@@ -97,9 +97,11 @@ int main(int argc, char* argv[]) {
             if (a.acknowledged)
                 continue;
             const auto local = a.triggerUtc.toLocalTime();
-            std::cout << a.remainingString().toStdString() << "  "
+            std::cout << (a.acknowledged ? "DONE" : a.remainingString().toStdString()) << "  "
                       << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")).toStdString()
-                      << "  " << a.label.toStdString() << "\n";
+                      << "  [" << a.command.toStdString() << "]"
+                      << (a.label.isEmpty() ? "" : (" " + a.label.toStdString()))
+                      << "\n";
         }
     }
 

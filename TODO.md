@@ -3,26 +3,24 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-008.1-clock-edit-done-071e920.bundle`
-- **Next bundle NNN:** 009
+- **Current tip:** HEAD of bundle `alarmqt-009.1-command-label-restart-071e920.bundle`
+- **Next bundle NNN:** 010
 
 ## Done recently
 
-- Prominent current time display
-- Alarms stay after ack as **DONE** (persisted; no auto-prune)
-- Edit alarm (label, when, done flag) — button / Ctrl+E / double-click
-- Remove confirms; table Status column ACTIVE / DUE / DONE
+- Split **command** (time expression) and **label** (optional note)
+- Table columns: Status | Remaining | When | Command | Label
+- **Restart** re-parses command from now (button, Ctrl+R, context menu)
+- Edit dialog edits command + label + when + done
 
-## Open / nice-to-have
+## Open
 
-- [ ] Mute / volume for notification sound
-- [ ] Recurring daily/weekly
-- [ ] Reactivate DONE alarm with one click
-- [ ] Parser unit tests
-- [ ] `--list` includes DONE with flag
+- [ ] Mute sound
+- [ ] Recurring alarms
+- [ ] One-click reactivate without re-parsing (keep same absolute time if future)
 
 ## Handoff
 
 ```bash
-git pull /path/to/alarmqt-008.1-clock-edit-done-071e920.bundle HEAD
+git pull /path/to/alarmqt-009.1-command-label-restart-071e920.bundle HEAD
 ```

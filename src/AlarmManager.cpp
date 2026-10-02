@@ -130,12 +130,11 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
 
     Alarm a;
     a.id = QUuid::createUuid();
+    a.command = timePart;
     if (!label.isEmpty())
         a.label = label;
-    else if (!note.isEmpty())
-        a.label = note;
     else
-        a.label = timePart;
+        a.label = note; // may be empty
     a.triggerUtc = triggerLocal.toUTC();
     a.acknowledged = false;
     a.triggered = false;
@@ -193,6 +192,43 @@ void AlarmManager::snooze(const QUuid& id, int minutes) {
         save();
         emit alarmsChanged();
     }
+}
+
+bool AlarmManager::restart(const QUuid& id) {
+    Alarm* a = alarmById(id);
+    if (!a)
+        return false;
+
+    // Prefer re-evaluating the original command from now
+    QString expr = a->command;
+    if (expr.isEmpty())
+        expr = a->label;
+
+    if (!expr.isEmpty()) {
+        auto opt = parse(expr, a->label);
+        if (opt) {
+            a->command = opt->command.isEmpty() ? expr : opt->command;
+            // keep existing user label
+            a->triggerUtc = opt->triggerUtc;
+            a->acknowledged = false;
+            a->triggered = false;
+            std::sort(m_alarms.begin(), m_alarms.end(),
+                      [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+            save();
+            emit alarmsChanged();
+            return true;
+        }
+    }
+
+    // Fallback: fire again in snoozeMinutes
+    a->triggerUtc = QDateTime::currentDateTimeUtc().addSecs(a->snoozeMinutes * 60);
+    a->acknowledged = false;
+    a->triggered = false;
+    std::sort(m_alarms.begin(), m_alarms.end(),
+              [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+    save();
+    emit alarmsChanged();
+    return true;
 }
 
 void AlarmManager::tick() {

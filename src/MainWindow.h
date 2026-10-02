@@ -36,7 +36,9 @@ private slots:
     void addFromInput();
     void removeSelected();
     void editSelected();
+    void restartSelected();
     void onRowDoubleClicked(int row, int column);
+    void onTableContextMenu(const QPoint& pos);
     void updateTray();
     void renotifyTriggered();
 

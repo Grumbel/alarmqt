@@ -17,7 +17,7 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     : QDialog(parent)
     , m_alarm(alarm)
 {
-    setWindowTitle(tr("Alarm – %1").arg(alarm.label));
+    setWindowTitle(tr("Alarm – %1").arg(alarm.displayName()));
     setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint);
     setModal(false);
     setMinimumWidth(420);
@@ -47,7 +47,7 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     auto* centerLayout = new QVBoxLayout(center);
     centerLayout->setContentsMargins(20, 16, 20, 16);
 
-    m_title = new QLabel(alarm.label);
+    m_title = new QLabel(alarm.displayName());
     m_title->setAlignment(Qt::AlignCenter);
     QFont titleFont = m_title->font();
     titleFont.setPointSize(titleFont.pointSize() + 6);

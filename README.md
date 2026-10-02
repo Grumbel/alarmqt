@@ -21,7 +21,9 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Countdown** shown for every alarm and in the tray tooltip
 - **Current time** displayed prominently
 - Finished alarms stay in the list as **DONE** (edit/remove manually)
+- **Command** (expression) and **Label** (note) are separate columns
 - **Edit** via button, Ctrl+E, or double-click
+- **Restart** re-arms from the original command (button, Ctrl+R, or right-click)
 - Classic **QWidget** UI (no QML)
 
 ## Build (Nix)

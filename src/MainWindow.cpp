@@ -29,7 +29,8 @@ namespace {
 constexpr int kColStatus = 0;
 constexpr int kColRemaining = 1;
 constexpr int kColWhen = 2;
-constexpr int kColLabel = 3;
+constexpr int kColCommand = 3;
+constexpr int kColLabel = 4;
 constexpr int kRoleId = Qt::UserRole;
 
 QColor rowBackground(const Alarm& a) {
@@ -81,20 +82,24 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_input->setClearButtonEnabled(true);
     auto* addBtn = new QPushButton(tr("Add"));
     auto* editBtn = new QPushButton(tr("Edit"));
+    auto* restartBtn = new QPushButton(tr("Restart"));
     auto* removeBtn = new QPushButton(tr("Remove"));
     inputRow->addWidget(m_input, 1);
     inputRow->addWidget(addBtn);
     inputRow->addWidget(editBtn);
+    inputRow->addWidget(restartBtn);
     inputRow->addWidget(removeBtn);
     layout->addLayout(inputRow);
 
     connect(m_input, &QLineEdit::returnPressed, this, &MainWindow::addFromInput);
     connect(addBtn, &QPushButton::clicked, this, &MainWindow::addFromInput);
     connect(editBtn, &QPushButton::clicked, this, &MainWindow::editSelected);
+    connect(restartBtn, &QPushButton::clicked, this, &MainWindow::restartSelected);
     connect(removeBtn, &QPushButton::clicked, this, &MainWindow::removeSelected);
 
-    m_table = new QTableWidget(0, 4);
-    m_table->setHorizontalHeaderLabels({tr("Status"), tr("Remaining"), tr("When"), tr("Label")});
+    m_table = new QTableWidget(0, 5);
+    m_table->setHorizontalHeaderLabels(
+        {tr("Status"), tr("Remaining"), tr("When"), tr("Command"), tr("Label")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -104,12 +109,15 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_table->horizontalHeader()->setSectionResizeMode(kColStatus, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(kColRemaining, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(kColWhen, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(kColCommand, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(kColLabel, QHeaderView::Stretch);
     m_table->setShowGrid(false);
     m_table->setFocusPolicy(Qt::StrongFocus);
+    m_table->setContextMenuPolicy(Qt::CustomContextMenu);
     layout->addWidget(m_table, 1);
 
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &MainWindow::onRowDoubleClicked);
+    connect(m_table, &QTableWidget::customContextMenuRequested, this, &MainWindow::onTableContextMenu);
 
     m_status = new QLabel;
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -122,6 +130,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     new QShortcut(QKeySequence::Delete, this, [this]() { removeSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, [this]() { removeSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), this, [this]() { editSelected(); });
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_R), this, [this]() { restartSelected(); });
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
 
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
@@ -256,6 +265,37 @@ void MainWindow::removeSelected() {
     }
 }
 
+void MainWindow::restartSelected() {
+    const auto rows = m_table->selectionModel()->selectedRows();
+    if (rows.isEmpty()) {
+        QMessageBox::information(this, tr("Restart"), tr("Select an alarm to restart."));
+        return;
+    }
+    for (const QModelIndex& idx : rows) {
+        auto* item = m_table->item(idx.row(), kColStatus);
+        if (!item)
+            continue;
+        const QUuid id = item->data(kRoleId).toUuid();
+        m_activeTriggered.remove(id);
+        if (auto* d = m_dialogs.take(id))
+            d->deleteLater();
+        m_manager->restart(id);
+    }
+}
+
+void MainWindow::onTableContextMenu(const QPoint& pos) {
+    const QModelIndex index = m_table->indexAt(pos);
+    if (index.isValid())
+        m_table->selectRow(index.row());
+
+    QMenu menu(this);
+    menu.addAction(tr("Edit…"), this, &MainWindow::editSelected);
+    menu.addAction(tr("Restart"), this, &MainWindow::restartSelected);
+    menu.addSeparator();
+    menu.addAction(tr("Remove"), this, &MainWindow::removeSelected);
+    menu.exec(m_table->viewport()->mapToGlobal(pos));
+}
+
 void MainWindow::onRowDoubleClicked(int row, int /*column*/) {
     auto* item = m_table->item(row, kColStatus);
     if (!item)
@@ -284,7 +324,10 @@ bool MainWindow::editAlarm(const QUuid& id) {
     dlg.setWindowTitle(tr("Edit alarm"));
     auto* form = new QFormLayout(&dlg);
 
+    auto* commandEdit = new QLineEdit(a->command);
+    commandEdit->setPlaceholderText(tr("in 5m  ·  at 15:10"));
     auto* labelEdit = new QLineEdit(a->label);
+    labelEdit->setPlaceholderText(tr("optional note"));
     auto* whenEdit = new QDateTimeEdit(a->triggerUtc.toLocalTime());
     whenEdit->setCalendarPopup(true);
     whenEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
@@ -293,6 +336,7 @@ bool MainWindow::editAlarm(const QUuid& id) {
     auto* doneCheck = new QCheckBox(tr("Done (acknowledged)"));
     doneCheck->setChecked(a->acknowledged);
 
+    form->addRow(tr("Command"), commandEdit);
     form->addRow(tr("Label"), labelEdit);
     form->addRow(tr("When"), whenEdit);
     form->addRow(QString(), doneCheck);
@@ -306,9 +350,8 @@ bool MainWindow::editAlarm(const QUuid& id) {
         return false;
 
     Alarm updated = *a;
+    updated.command = commandEdit->text().trimmed();
     updated.label = labelEdit->text().trimmed();
-    if (updated.label.isEmpty())
-        updated.label = a->label;
     QDateTime local = whenEdit->dateTime();
     local.setTimeZone(QTimeZone::systemTimeZone());
     updated.triggerUtc = local.toUTC();
@@ -356,14 +399,15 @@ void MainWindow::refreshList() {
             a.acknowledged ? QStringLiteral("—") : a.remainingString());
         auto* when = new QTableWidgetItem(
             local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
-        auto* label = new QTableWidgetItem(a.label);
+        auto* command = new QTableWidgetItem(a.command);
+        auto* label = new QTableWidgetItem(a.label.isEmpty() ? QStringLiteral("—") : a.label);
 
         status->setData(kRoleId, a.id);
         remaining->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         status->setTextAlignment(Qt::AlignCenter);
 
         const QColor bg = rowBackground(a);
-        for (QTableWidgetItem* item : {status, remaining, when, label}) {
+        for (QTableWidgetItem* item : {status, remaining, when, command, label}) {
             if (bg.isValid())
                 item->setBackground(bg);
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
@@ -372,6 +416,7 @@ void MainWindow::refreshList() {
         m_table->setItem(row, kColStatus, status);
         m_table->setItem(row, kColRemaining, remaining);
         m_table->setItem(row, kColWhen, when);
+        m_table->setItem(row, kColCommand, command);
         m_table->setItem(row, kColLabel, label);
 
         if (selected.contains(a.id))
@@ -391,7 +436,7 @@ void MainWindow::refreshList() {
         m_status->setText(tr("Next: %1  (%2)  —  %3")
                               .arg(next->remainingString(),
                                    local.toString(QStringLiteral("HH:mm:ss")),
-                                   next->label));
+                                   next->displayName()));
     } else {
         m_status->setText(tr("No active alarms"));
     }
@@ -400,7 +445,7 @@ void MainWindow::refreshList() {
 void MainWindow::updateTray() {
     if (auto next = m_manager->nextAlarm()) {
         m_tray->setToolTip(tr("AlarmQt – next in %1\n%2")
-                               .arg(next->remainingString(), next->label));
+                               .arg(next->remainingString(), next->displayName()));
     } else {
         m_tray->setToolTip(tr("AlarmQt – no alarms"));
     }
@@ -409,7 +454,7 @@ void MainWindow::updateTray() {
 void MainWindow::onAlarmTriggered(const Alarm& a) {
     m_activeTriggered.insert(a.id);
     showNotification(a);
-    m_tray->showMessage(tr("Alarm"), a.label, QSystemTrayIcon::Warning, 10'000);
+    m_tray->showMessage(tr("Alarm"), a.displayName(), QSystemTrayIcon::Warning, 10'000);
 }
 
 void MainWindow::renotifyTriggered() {
@@ -423,7 +468,7 @@ void MainWindow::renotifyTriggered() {
             continue;
         }
         showNotification(*a);
-        m_tray->showMessage(tr("Alarm (still active)"), a->label,
+        m_tray->showMessage(tr("Alarm (still active)"), a->displayName(),
                             QSystemTrayIcon::Warning, 8'000);
     }
 }
@@ -471,7 +516,7 @@ void MainWindow::handleExternalCommand(const QString& cmd) {
     if (opt) {
         m_manager->add(*opt);
         raiseAndActivate();
-        m_tray->showMessage(tr("Alarm added"), opt->label,
+        m_tray->showMessage(tr("Alarm added"), opt->displayName(),
                             QSystemTrayIcon::Information, 3'000);
     } else {
         m_tray->showMessage(tr("Parse error"),

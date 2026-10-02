@@ -10,7 +10,8 @@
 
 struct Alarm {
     QUuid id;
-    QString label;           // user-visible description / original input
+    QString command;         // original time expression, e.g. "in 5m" or "at 15:10"
+    QString label;           // optional user note, e.g. "kitchen" (may be empty)
     QDateTime triggerUtc;    // absolute UTC instant
     bool repeating = false;  // currently unused (future)
     int snoozeMinutes = 5;
@@ -19,6 +20,9 @@ struct Alarm {
 
     QJsonObject toJson() const;
     static Alarm fromJson(const QJsonObject& obj);
+
+    /** Prefer label for UI; fall back to command. */
+    QString displayName() const;
 
     QString remainingString(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
     qint64 remainingMs(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
