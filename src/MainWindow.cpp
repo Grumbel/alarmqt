@@ -331,7 +331,7 @@ bool MainWindow::editAlarm(const QUuid& id) {
     auto* whenEdit = new QDateTimeEdit(a->triggerUtc.toLocalTime());
     whenEdit->setCalendarPopup(true);
     whenEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
-    whenEdit->setTimeSpec(Qt::LocalTime);
+    whenEdit->setTimeZone(QTimeZone::systemTimeZone());
 
     auto* doneCheck = new QCheckBox(tr("Done (acknowledged)"));
     doneCheck->setChecked(a->acknowledged);
