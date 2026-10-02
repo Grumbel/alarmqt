@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** `fc6b0d0` – fix: re-notify every 30s until ack; prune finished alarms
-- **Next bundle NNN:** 003 (002 is the bundle that reaches this tip)
+- **Current tip:** HEAD of bundle `alarmqt-002.2-continuity-renotify-071e920.bundle`
+- **Next bundle NNN:** 003
 
 ## Done in this line
 
@@ -34,4 +34,8 @@
 
 ## Handoff
 
-Anyone continuing: read `AGENTS.md`, this file, then `git log`. Apply the latest `alarmqt-NNN.*.bundle` from artifacts if not already at tip.
+Anyone continuing: read `AGENTS.md`, this file, then `git log`. Apply the latest `alarmqt-NNN.*.bundle` from artifacts if not already at tip:
+
+```bash
+git pull /path/to/alarmqt-002.2-continuity-renotify-071e920.bundle HEAD
+```
