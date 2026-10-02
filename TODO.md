@@ -3,40 +3,30 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-005.1-short-appstream-id-071e920.bundle`
-- **Next bundle NNN:** 006
+- **Current tip:** HEAD of bundle `alarmqt-006.1-cli-table-ui-071e920.bundle`
+- **Next bundle NNN:** 007
 
 ## Done in this line
 
-- Initial QWidget app: tray, single-instance, relative/absolute parse, JSON persistence, ack/snooze dialog (`071e920`)
-- Continuity docs (`AGENTS.md`, `TODO.md`)
-- REUSE / SPDX / LICENSE (GPL-3.0-or-later)
-- Re-notify loop while alarm is triggered and unacknowledged
-- Prune acknowledged alarms on load/save
-- Fix QShortcut compile error on Qt 6.11 (member ptr → lambda)
-- Cute anime SVG icon; full Linux desktop integration (.desktop, AppStream, hicolor icon install, setDesktopFileName, --raise)
+- Initial QWidget app + continuity docs + REUSE/LICENSE
+- Re-notify until ack; prune finished alarms
+- Qt 6.11 QShortcut fix
+- Anime SVG icon; desktop integration; short AppStream id `alarmqt`
+- CLI add via running instance (SingleInstance read-on-accept race fix)
+- Table UI (Remaining / When / Label) with row background highlights
 
 ## Open / nice-to-have
 
-- [ ] Sound on trigger (optional, e.g. `QSoundEffect` or `paplay`)
-- [ ] Daily / weekly repeat (data model already has `repeating` flag)
-- [ ] Snooze presets configurable
-- [ ] Tray icon tint when alarm is due soon
-- [ ] `--list` should print from primary via reply protocol (currently secondary only hints)
+- [ ] Sound on trigger
+- [ ] Daily / weekly repeat
+- [ ] `--list` reply protocol from primary
 - [ ] Unit tests for the time parser
-- [ ] PNG fallbacks for icon themes that ignore SVG (optional)
-- [ ] `update-desktop-database` / icon cache note for non-Nix packaging
-
-## Known limitations
-
-- Parser is regex-based, not full natural language (“next Tuesday”).
-- No network time / NTP awareness beyond OS clock.
-- Acknowledged alarms are dropped on next save (no history UI).
+- [ ] Sortable table columns
 
 ## Handoff
 
 ```bash
-git pull /path/to/alarmqt-005.1-short-appstream-id-071e920.bundle HEAD
+git pull /path/to/alarmqt-006.1-cli-table-ui-071e920.bundle HEAD
 ```
 
-Requires base `071e920`. Read `AGENTS.md` and this file.
+Requires base `071e920`.
