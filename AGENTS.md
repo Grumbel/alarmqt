@@ -18,7 +18,7 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 | Piece | Role |
 |-------|------|
 | `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, flags) |
-| `AlarmManager` | Parse, persist (`~/.local/share/Grumbel/alarmqt/alarms.json`), 1 Hz tick, signals |
+| `AlarmManager` | Parse, persist (`~/.local/share/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
 | `NotificationDialog` | Always-on-top dialog; side blinkers + sound; Ack / Snooze |
 | `AlarmDBus` | Session bus `org.alarmqt.AlarmQt` — secondary CLI talks to primary |

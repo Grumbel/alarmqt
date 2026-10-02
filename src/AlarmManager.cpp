@@ -399,8 +399,23 @@ QString AlarmManager::storagePath() const {
     return dir + QStringLiteral("/alarms.json");
 }
 
+/** Pre-organization-less path: ~/.local/share/Grumbel/alarmqt/alarms.json */
+static QString legacyStoragePath() {
+    const QString home = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    return home + QStringLiteral("/.local/share/Grumbel/alarmqt/alarms.json");
+}
+
 void AlarmManager::load() {
-    QFile f(storagePath());
+    QString path = storagePath();
+    bool fromLegacy = false;
+    if (!QFile::exists(path)) {
+        const QString legacy = legacyStoragePath();
+        if (QFile::exists(legacy)) {
+            path = legacy;
+            fromLegacy = true;
+        }
+    }
+    QFile f(path);
     if (!f.open(QIODevice::ReadOnly))
         return;
     const auto doc = QJsonDocument::fromJson(f.readAll());
@@ -433,8 +448,8 @@ void AlarmManager::load() {
             changed = true;
         }
     }
-    if (changed)
-        save();
+    if (changed || fromLegacy)
+        save(); // also migrates ~/.local/share/Grumbel/alarmqt/ → ~/.local/share/alarmqt/
 }
 
 void AlarmManager::save() const {
