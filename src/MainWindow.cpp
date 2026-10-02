@@ -362,7 +362,7 @@ bool MainWindow::editAlarm(const QUuid& id) {
 
     auto* applyCmdBtn = new QPushButton(tr("Apply command → When"));
     form->addRow(QString(), applyCmdBtn);
-    QObject::connect(applyCmdBtn, &QPushButton::clicked, &dlg, [=]() {
+    QObject::connect(applyCmdBtn, &QPushButton::clicked, &dlg, [this, commandEdit, labelEdit, whenEdit, &dlg]() {
         const QString cmd = commandEdit->text().trimmed();
         auto opt = AlarmManager::parse(cmd, labelEdit->text().trimmed());
         if (!opt) {
