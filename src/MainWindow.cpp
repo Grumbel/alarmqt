@@ -57,8 +57,8 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
         m_input->setFocus();
         m_input->selectAll();
     });
-    new QShortcut(QKeySequence::Delete, this, &MainWindow::removeSelected);
-    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, &MainWindow::removeSelected);
+    new QShortcut(QKeySequence::Delete, this, [this]() { removeSelected(); });
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, [this]() { removeSelected(); });
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
 
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
