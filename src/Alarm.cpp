@@ -12,7 +12,8 @@ QJsonObject Alarm::toJson() const {
     o["label"] = label;
     o["triggerUtc"] = triggerUtc.toUTC().toString(Qt::ISODateWithMs);
     o["scheduledUtc"] = scheduledUtc.toUTC().toString(Qt::ISODateWithMs);
-    o["repeating"] = repeating;
+    if (recurrence.isRecurring())
+        o["recurrence"] = recurrence.toJson();
     o["snoozeMinutes"] = snoozeMinutes;
     o["acknowledged"] = acknowledged;
     o["triggered"] = triggered;
@@ -36,7 +37,7 @@ Alarm Alarm::fromJson(const QJsonObject& obj) {
     }
     if (!a.scheduledUtc.isValid())
         a.scheduledUtc = a.triggerUtc;
-    a.repeating = obj["repeating"].toBool(false);
+    a.recurrence = Recurrence::fromJson(obj["recurrence"].toObject());
     a.snoozeMinutes = obj["snoozeMinutes"].toInt(5);
     a.acknowledged = obj["acknowledged"].toBool(false);
     a.triggered = obj["triggered"].toBool(false);
@@ -51,6 +52,18 @@ QString Alarm::displayName() const {
     if (!command.isEmpty())
         return command;
     return QStringLiteral("(unnamed)");
+}
+
+QString Alarm::statusText(const QDateTime& nowUtc) const {
+    if (acknowledged)
+        return QStringLiteral("DONE");
+    if (missed)
+        return QStringLiteral("MISSED");
+    if (triggered || isDue(nowUtc))
+        return QStringLiteral("DUE");
+    if (snoozed)
+        return QStringLiteral("SNOOZED");
+    return QStringLiteral("ACTIVE");
 }
 
 qint64 Alarm::remainingMs(const QDateTime& nowUtc) const {

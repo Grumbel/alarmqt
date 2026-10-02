@@ -22,19 +22,7 @@ QString AlarmDBus::formatLine(const Alarm& a) {
     const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
     const auto local = whenSrc.toLocalTime();
 
-    QString st;
-    if (a.acknowledged)
-        st = QStringLiteral("DONE");
-    else if (a.missed)
-        st = QStringLiteral("MISSED");
-    else if (a.triggered)
-        st = QStringLiteral("DUE");
-    else if (a.snoozed)
-        st = QStringLiteral("SNOOZED");
-    else if (a.isDue())
-        st = QStringLiteral("DUE");
-    else
-        st = QStringLiteral("ACTIVE");
+    const QString st = a.statusText();
 
     QString remaining;
     if (a.acknowledged)

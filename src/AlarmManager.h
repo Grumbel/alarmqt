@@ -28,7 +28,10 @@ public:
     void add(const Alarm& a);
     void update(const Alarm& a); // replace existing by id
     void remove(const QUuid& id);
+    /** One-shot alarms become DONE; recurring ones move to their next occurrence. */
     void acknowledge(const QUuid& id);
+    /** Recurring only: drop the upcoming occurrence and schedule the one after. */
+    bool skipNext(const QUuid& id);
     void snooze(const QUuid& id, int minutes = -1); // -1 → use alarm's default
     /** Re-arm alarm from its command (or same absolute time next occurrence). */
     bool restart(const QUuid& id);
@@ -51,6 +54,7 @@ private slots:
 
 private:
     void sortAlarms();
+    void advanceRecurring(Alarm& a);
 
     QVector<Alarm> m_alarms;
     QTimer m_timer;

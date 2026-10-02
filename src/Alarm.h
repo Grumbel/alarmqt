@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "Recurrence.h"
+
 #include <QDateTime>
 #include <QString>
 #include <QUuid>
@@ -14,7 +16,7 @@ struct Alarm {
     QString label;           // optional user note, e.g. "stretch" (may be empty)
     QDateTime triggerUtc;    // next fire time (moves on snooze)
     QDateTime scheduledUtc;  // intended "real" alarm time (unchanged by snooze)
-    bool repeating = false;  // currently unused (future)
+    Recurrence recurrence;   // repeat rule; acknowledging re-arms instead of DONE
     int snoozeMinutes = 5;
     bool acknowledged = false;
     bool triggered = false;
@@ -26,6 +28,9 @@ struct Alarm {
 
     /** Prefer label for UI; fall back to command. */
     QString displayName() const;
+
+    /** DONE / MISSED / DUE / SNOOZED / ACTIVE */
+    QString statusText(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
 
     QString remainingString(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
     qint64 remainingMs(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;

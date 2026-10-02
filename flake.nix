@@ -59,9 +59,11 @@
           ];
 
           doCheck = true;
-          # QTest may touch GUI plugins; force offscreen.
+          # QTest may touch GUI plugins; force offscreen. Recurrence tests need
+          # real zones (Europe/Berlin DST), which the build sandbox lacks.
           preCheck = ''
             export QT_QPA_PLATFORM=offscreen
+            export TZDIR=${pkgs.tzdata}/share/zoneinfo
           '';
 
           meta = with lib; {

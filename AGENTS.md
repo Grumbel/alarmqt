@@ -17,7 +17,8 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 
 | Piece | Role |
 |-------|------|
-| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, flags) |
+| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, `scheduledUtc`, `recurrence`, flags) |
+| `Recurrence` | Repeat rule (interval / weekly mask + local time); `nextAfter()` |
 | `AlarmManager` | Parse, persist (`$XDG_STATE_HOME/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
 | `NotificationDialog` | Always-on-top dialog; side blinkers + sound; Ack / Snooze |
@@ -26,7 +27,11 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 - Alarms are stored as absolute UTC; UI shows local time.
 - `command` = time expression (`in 5m`, `at 15:10`); `label` = optional note.
 - Relative / absolute / note parsing lives in `AlarmManager::parse`.
-- Acknowledged alarms stay as **DONE** until removed or cleared.
+- Acknowledged alarms stay as **DONE** until removed or cleared. Recurring
+  alarms never become DONE: acknowledge / Skip next move `scheduledUtc` to
+  `Recurrence::nextAfter(max(scheduledUtc, now))`; intervals count from the ack.
+- Weekly rules are local wall-clock: build candidates from date + time in the
+  zone, never by adding 24h. Test DST cases in `tests/test_recurrence.cpp`.
 - `AlarmManager::alarms()` returns a reference; never hold `Alarm*` / references
   across a nested event loop (`QDialog::exec`, `QMessageBox`) – re-look up by id.
 - Quit via `QApplication::exit()`, not `quit()`: Qt 6 `quit()` sends close
@@ -46,6 +51,8 @@ alarmqt                  # raise
 alarmqt "in 5m"          # add
 alarmqt "in 10m stretch"
 alarmqt "at 15:10"
+alarmqt "every 5m"
+alarmqt "every monday at 18:00 laundry"
 alarmqt --list
 alarmqt --quit
 alarmqt --raise
@@ -63,12 +70,17 @@ nix develop -c cmake -B build && nix develop -c cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
-Parser tests live in `tests/test_parser.cpp`; extend them when touching
-`AlarmManager::parse`.
+Parser tests live in `tests/test_parser.cpp`, recurrence rules and
+acknowledge/skip behaviour in `tests/test_recurrence.cpp`; extend them when
+touching `AlarmManager::parse` or `Recurrence`.
 
-When running the GUI for experiments, set `XDG_DATA_HOME` and `XDG_RUNTIME_DIR`
-to temp dirs so you neither touch the user's alarms nor talk to their running
-instance (the single-instance socket name is fixed).
+When running the GUI for experiments, use a private session bus and state dir
+so you neither touch the user's alarms nor talk to their running instance:
+
+```bash
+XDG_STATE_HOME=$(mktemp -d) QT_QPA_PLATFORM=offscreen \
+  dbus-run-session -- ./build/alarmqt "every 5s test"
+```
 
 ## Standing rules (agents)
 

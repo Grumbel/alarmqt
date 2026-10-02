@@ -68,8 +68,11 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
 
     const QDateTime whenLocal = (alarm.scheduledUtc.isValid() ? alarm.scheduledUtc : alarm.triggerUtc)
                                     .toLocalTime();
-    m_when = new QLabel(tr("When: %1").arg(
-        whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t"))));
+    QString whenText = tr("When: %1").arg(
+        whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+    if (alarm.recurrence.isRecurring())
+        whenText += tr("  ·  repeats %1").arg(alarm.recurrence.describe());
+    m_when = new QLabel(whenText);
     m_when->setAlignment(Qt::AlignCenter);
 
     if (alarm.missed) {
@@ -90,7 +93,10 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     auto* btnLayout = new QHBoxLayout;
     auto* snooze5 = new QPushButton(tr("Snooze 5m"));
     auto* snooze10 = new QPushButton(tr("Snooze 10m"));
-    auto* ackBtn = new QPushButton(tr("Acknowledge (Enter)"));
+    // Recurring alarms re-arm on acknowledge instead of becoming DONE.
+    auto* ackBtn = new QPushButton(alarm.recurrence.isRecurring()
+                                       ? tr("Acknowledge, repeat (Enter)")
+                                       : tr("Acknowledge (Enter)"));
     ackBtn->setDefault(true);
     btnLayout->addWidget(snooze5);
     btnLayout->addWidget(snooze10);

@@ -38,15 +38,41 @@ Alarm* AlarmManager::alarmById(const QUuid& id) {
 
 // One optional "<n> unit" group per unit, in d/h/m/s order. The lookahead
 // keeps "in 5 hamburgers" from matching as "in 5h" + note "amburgers".
-static const QString kDurationPattern = QStringLiteral(
-    R"((?:in\s+)?)"
+static const QString kDurationUnits = QStringLiteral(
     R"((?:(\d+)\s*d(?:ays?)?(?![a-z]))?\s*)"
     R"((?:(\d+)\s*h(?:ours?|rs?)?(?![a-z]))?\s*)"
     R"((?:(\d+)\s*m(?:in(?:ute)?s?)?(?![a-z]))?\s*)"
     R"((?:(\d+)\s*s(?:ec(?:ond)?s?)?(?![a-z]))?)");
+static const QString kDurationPattern = QStringLiteral(R"((?:in\s+)?)") + kDurationUnits;
 
 // Upper bound for relative alarms; also keeps the arithmetic below in range.
 static constexpr qint64 kMaxRelativeSecs = 100LL * 366 * 86400;
+
+/**
+ * Seconds of a kDurationUnits match whose d/h/m/s groups start at `firstGroup`.
+ * Returns -1 for no match, no unit given, or a duration out of range.
+ */
+static qint64 durationSecs(const QRegularExpressionMatch& m, int firstGroup) {
+    if (!m.hasMatch())
+        return -1;
+    static constexpr qint64 kUnitSecs[] = {86400, 3600, 60, 1};
+    qint64 secs = 0;
+    bool any = false;
+    for (int i = 0; i < 4; ++i) {
+        const QString digits = m.captured(firstGroup + i);
+        if (digits.isEmpty())
+            continue;
+        any = true;
+        bool ok = false;
+        const qint64 n = digits.toLongLong(&ok);
+        if (!ok || n > kMaxRelativeSecs / kUnitSecs[i])
+            return -1;
+        secs += n * kUnitSecs[i];
+    }
+    if (!any || secs <= 0 || secs > kMaxRelativeSecs)
+        return -1;
+    return secs;
+}
 
 static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     // Matches: in 5m, in 2h30m, in 1d 2h, 5 minutes, etc.
@@ -55,26 +81,9 @@ static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
         QStringLiteral(R"(\A)") + kDurationPattern + QStringLiteral(R"(\s*\z)"),
         QRegularExpression::CaseInsensitiveOption);
 
-    auto m = re.match(s.trimmed());
-    if (!m.hasMatch() || (m.captured(1).isEmpty() && m.captured(2).isEmpty()
-                          && m.captured(3).isEmpty() && m.captured(4).isEmpty()))
+    const qint64 secs = durationSecs(re.match(s.trimmed()), 1);
+    if (secs <= 0)
         return {};
-
-    static constexpr qint64 kUnitSecs[] = {86400, 3600, 60, 1};
-    qint64 secs = 0;
-    for (int i = 0; i < 4; ++i) {
-        const QString digits = m.captured(i + 1);
-        if (digits.isEmpty())
-            continue;
-        bool ok = false;
-        const qint64 n = digits.toLongLong(&ok);
-        if (!ok || n > kMaxRelativeSecs / kUnitSecs[i])
-            return {};
-        secs += n * kUnitSecs[i];
-    }
-    if (secs <= 0 || secs > kMaxRelativeSecs)
-        return {};
-
     return nowLocal.addSecs(secs);
 }
 
@@ -156,6 +165,40 @@ static bool peelGluedZone(QString* text, QTimeZone* zone) {
     return true;
 }
 
+/** Wall-clock time: 24h "15:10[:00]" or American 12-hour "6:00am", "6 PM", "12am". */
+static QTime parseTimeOfDay(const QString& text) {
+    const QString t = text.trimmed();
+    QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
+    if (!time.isValid())
+        time = QTime::fromString(t, QStringLiteral("HH:mm"));
+    if (!time.isValid())
+        time = QTime::fromString(t, QStringLiteral("H:mm:ss"));
+    if (!time.isValid())
+        time = QTime::fromString(t, QStringLiteral("H:mm"));
+    if (time.isValid())
+        return time;
+
+    QString norm = t;
+    norm.replace(QLatin1Char('.'), QString());
+    static const QRegularExpression amPmRe(
+        R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap])m\z)",
+        QRegularExpression::CaseInsensitiveOption);
+    const auto m = amPmRe.match(norm.trimmed());
+    if (!m.hasMatch())
+        return {};
+    int hour = m.captured(1).toInt();
+    const int minute = m.captured(2).isEmpty() ? 0 : m.captured(2).toInt();
+    const int second = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
+    const bool pm = m.captured(4).compare(QLatin1String("p"), Qt::CaseInsensitive) == 0;
+    if (hour < 1 || hour > 12 || minute > 59 || second > 59)
+        return {};
+    if (pm && hour < 12)
+        hour += 12;
+    else if (!pm && hour == 12)
+        hour = 0;
+    return QTime(hour, minute, second);
+}
+
 static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
     QString t = s.trimmed();
     // strip leading "at "
@@ -195,41 +238,106 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
         return dt;
     }
 
-    // Time only (24h): 15:10 or 15:10:00
-    {
-        QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
+    // Time only: 15:10, 15:10:00, 6pm, 6:30 a.m.
+    return finalizeTimeOnly(parseTimeOfDay(t));
+}
+
+/** Turn the text after a recurrence expression into a note: ", x", "(x)", "\"x\"" → "x". */
+static QString cleanNote(QString rest) {
+    rest = rest.trimmed();
+    if (rest.startsWith(QLatin1Char(',')))
+        rest = rest.mid(1).trimmed();
+    static const QRegularExpression wrapped(R"re(\A(?:\((.*)\)|"(.*)"|'(.*)')\z)re");
+    if (const auto m = wrapped.match(rest); m.hasMatch())
+        rest = (m.captured(1) + m.captured(2) + m.captured(3)).trimmed();
+    return rest;
+}
+
+/** Day-mask for one day token: "mon", "mondays", "tues", "weekday", "day", ... */
+static quint8 dayTokenMask(QString token) {
+    token = token.toLower();
+    if (token.startsWith(QLatin1String("weekday")))
+        return Recurrence::kWeekdays;
+    if (token.startsWith(QLatin1String("weekend")))
+        return Recurrence::kWeekend;
+    if (token == QLatin1String("day") || token == QLatin1String("days")
+        || token == QLatin1String("daily"))
+        return Recurrence::kEveryDay;
+    static const char* const kDays[] = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+    for (int i = 0; i < 7; ++i)
+        if (token.startsWith(QLatin1String(kDays[i])))
+            return static_cast<quint8>(1 << i);
+    return 0;
+}
+
+/**
+ * Recognise a repeating expression at the start of `input`:
+ *   every 5m / each 1h30m / every hour       → Interval
+ *   every monday at 18:00 / every mon, thu 6pm
+ *   every weekday at 9:00 / daily at 7:30    → Weekly
+ * Anything after the expression becomes the note.
+ */
+static bool parseRecurring(const QString& input, QString* timePart, QString* note,
+                           Recurrence* rec) {
+    static const QString kDay = QStringLiteral(
+        R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
+        R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
+    static const QString kTime = QStringLiteral(
+        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)(?![\w:]))");
+
+    static const QRegularExpression weeklyRe(
+        QStringLiteral(R"(\A(?:(?:every|each)\s+()") + kDay
+            + QStringLiteral(R"((?:\s*(?:,|/|&|\band\b)\s*)") + kDay
+            + QStringLiteral(R"()*)|(daily|weekdays|weekends))\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression intervalRe(
+        QStringLiteral(R"(\A(?:every|each)\s+)") + kDurationUnits,
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression unitRe(
+        QStringLiteral(R"(\A(?:every|each)\s+(hour|minute)\b)"),
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression daySplitRe(
+        QStringLiteral(R"(\s*(?:,|/|&|\band\b)\s*)"), QRegularExpression::CaseInsensitiveOption);
+
+    if (const auto m = weeklyRe.match(input); m.hasMatch()) {
+        const QTime time = parseTimeOfDay(m.captured(3));
         if (!time.isValid())
-            time = QTime::fromString(t, QStringLiteral("HH:mm"));
-        dt = finalizeTimeOnly(time);
-        if (dt.isValid())
-            return dt;
+            return false;
+        const QString days = m.captured(1).isEmpty() ? m.captured(2) : m.captured(1);
+        quint8 mask = 0;
+        for (const QString& tok : days.split(daySplitRe, Qt::SkipEmptyParts))
+            mask |= dayTokenMask(tok.trimmed());
+        if (mask == 0)
+            return false;
+        rec->kind = Recurrence::Kind::Weekly;
+        rec->time = time;
+        rec->weekdays = mask;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
     }
 
-    // American 12-hour: 6:00am, 6:00 pm, 6am, 6 PM, 12:00am/pm
-    {
-        QString norm = t;
-        norm.replace(QLatin1Char('.'), QString());
-        static const QRegularExpression amPmReFlat(
-            R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap])m\z)",
-            QRegularExpression::CaseInsensitiveOption);
-        if (auto m = amPmReFlat.match(norm.trimmed()); m.hasMatch()) {
-            int hour = m.captured(1).toInt();
-            const int minute = m.captured(2).isEmpty() ? 0 : m.captured(2).toInt();
-            const int second = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
-            const bool pm = m.captured(4).compare(QLatin1String("p"), Qt::CaseInsensitive) == 0;
-            if (hour >= 1 && hour <= 12 && minute <= 59 && second <= 59) {
-                if (pm && hour < 12)
-                    hour += 12;
-                else if (!pm && hour == 12)
-                    hour = 0;
-                dt = finalizeTimeOnly(QTime(hour, minute, second));
-                if (dt.isValid())
-                    return dt;
-            }
-        }
+    if (const auto m = unitRe.match(input); m.hasMatch()) {
+        rec->kind = Recurrence::Kind::Interval;
+        rec->intervalSecs = m.captured(1).compare(QLatin1String("hour"), Qt::CaseInsensitive) == 0
+                                ? 3600 : 60;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
     }
 
-    return {};
+    if (const auto m = intervalRe.match(input); m.hasMatch()) {
+        const qint64 secs = durationSecs(m, 1);
+        if (secs <= 0)
+            return false;
+        rec->kind = Recurrence::Kind::Interval;
+        rec->intervalSecs = secs;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
+
+    return false;
 }
 
 // Split "time expression" + optional human note.
@@ -309,16 +417,21 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
 
     QString timePart;
     QString note;
-    splitTimeAndNote(trimmed, &timePart, &note);
+    Recurrence rec;
+    const bool recurring = parseRecurring(trimmed, &timePart, &note, &rec);
+    if (!recurring)
+        splitTimeAndNote(trimmed, &timePart, &note);
 
     const QDateTime nowLocal = QDateTime::currentDateTime();
     QDateTime triggerLocal;
 
-    // Prefer relative if it looks like one
-    if (timePart.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
+    if (recurring) {
+        triggerLocal = rec.nextAfter(nowLocal.toUTC());
+    } else if (timePart.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
+        // Prefer relative if it looks like one
         triggerLocal = parseRelative(timePart, nowLocal);
     }
-    if (!triggerLocal.isValid())
+    if (!triggerLocal.isValid() && !recurring)
         triggerLocal = parseAbsolute(timePart, nowLocal);
     if (!triggerLocal.isValid())
         return std::nullopt;
@@ -330,6 +443,7 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
         a.label = label;
     else
         a.label = note; // may be empty
+    a.recurrence = rec;
     a.triggerUtc = triggerLocal.toUTC();
     a.scheduledUtc = a.triggerUtc;
     a.acknowledged = false;
@@ -370,16 +484,51 @@ void AlarmManager::remove(const QUuid& id) {
     }
 }
 
+void AlarmManager::advanceRecurring(Alarm& a) {
+    // Never before the planned time (so skipping an upcoming occurrence moves
+    // past it) and never in the past (missed occurrences are not replayed).
+    const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
+    const QDateTime base = std::max(a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc,
+                                    nowUtc);
+    const QDateTime next = a.recurrence.nextAfter(base);
+    if (!next.isValid())
+        return;
+    a.triggerUtc = next;
+    a.scheduledUtc = next;
+    a.acknowledged = false;
+    a.triggered = false;
+    a.snoozed = false;
+    a.missed = false;
+}
+
 void AlarmManager::acknowledge(const QUuid& id) {
     if (auto* a = alarmById(id)) {
-        a->acknowledged = true;
-        a->triggered = false;
-        a->snoozed = false;
-        a->missed = false;
+        if (a->recurrence.isRecurring()) {
+            advanceRecurring(*a);
+            sortAlarms();
+        } else {
+            a->acknowledged = true;
+            a->triggered = false;
+            a->snoozed = false;
+            a->missed = false;
+        }
         save();
         emit alarmAcknowledged(id);
         emit alarmsChanged();
     }
+}
+
+bool AlarmManager::skipNext(const QUuid& id) {
+    Alarm* a = alarmById(id);
+    if (!a || !a->recurrence.isRecurring())
+        return false;
+    advanceRecurring(*a);
+    sortAlarms();
+    save();
+    // Closes an open notification for the skipped occurrence.
+    emit alarmAcknowledged(id);
+    emit alarmsChanged();
+    return true;
 }
 
 void AlarmManager::snooze(const QUuid& id, int minutes) {
@@ -427,6 +576,7 @@ bool AlarmManager::restart(const QUuid& id) {
         auto opt = parse(expr, a->label);
         if (opt) {
             a->command = opt->command.isEmpty() ? expr : opt->command;
+            a->recurrence = opt->recurrence;
             a->triggerUtc = opt->triggerUtc;
             // Never schedule in the past: roll full datetimes forward day by day
             while (a->triggerUtc <= nowUtc)

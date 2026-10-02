@@ -18,20 +18,6 @@
 #  define ALARMQT_VERSION "0.0.0-unknown"
 #endif
 
-static QString statusLabel(const Alarm& a) {
-    if (a.acknowledged)
-        return QStringLiteral("DONE");
-    if (a.missed)
-        return QStringLiteral("MISSED");
-    if (a.triggered)
-        return QStringLiteral("DUE");
-    if (a.snoozed)
-        return QStringLiteral("SNOOZED");
-    if (a.isDue())
-        return QStringLiteral("DUE");
-    return QStringLiteral("ACTIVE");
-}
-
 static void printAlarmList(const AlarmManager& manager, bool includeDone) {
     for (const auto& a : manager.alarms()) {
         if (!includeDone && a.acknowledged)
@@ -45,7 +31,7 @@ static void printAlarmList(const AlarmManager& manager, bool includeDone) {
             remaining = QStringLiteral("snooze %1").arg(a.remainingString());
         else
             remaining = a.remainingString();
-        std::cout << statusLabel(a).toStdString() << "  "
+        std::cout << a.statusText().toStdString() << "  "
                   << remaining.toStdString() << "  "
                   << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")).toStdString()
                   << "  [" << a.command.toStdString() << "]"

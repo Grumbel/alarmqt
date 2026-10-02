@@ -34,6 +34,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus Svg Multimedia)
 add_executable(alarmqt
   src/main.cpp
   src/Alarm.cpp
+  src/Recurrence.cpp
   src/AlarmManager.cpp
   src/MainWindow.cpp
   src/AlarmDBus.cpp
@@ -80,6 +81,7 @@ if(ALARMQT_BUILD_TESTS)
   add_executable(test_parser
     tests/test_parser.cpp
     src/Alarm.cpp
+    src/Recurrence.cpp
     src/AlarmManager.cpp
   )
   target_include_directories(test_parser PRIVATE src)
@@ -89,6 +91,22 @@ if(ALARMQT_BUILD_TESTS)
   )
   add_test(NAME parser COMMAND test_parser)
   set_tests_properties(parser PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+  )
+
+  add_executable(test_recurrence
+    tests/test_recurrence.cpp
+    src/Alarm.cpp
+    src/Recurrence.cpp
+    src/AlarmManager.cpp
+  )
+  target_include_directories(test_recurrence PRIVATE src)
+  target_link_libraries(test_recurrence PRIVATE
+    Qt6::Core
+    Qt6::Test
+  )
+  add_test(NAME recurrence COMMAND test_recurrence)
+  set_tests_properties(recurrence PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
   )
 endif()

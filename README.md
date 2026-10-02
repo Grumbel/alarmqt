@@ -10,6 +10,8 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
   - `in 5m`, `in 2h30m`, `in 1d`, `in 10 mins`, `in 2 hours`
   - `at 15:10`, `at 2026-10-03 09:00`, `6:00pm`, `6am`
   - glued zone on absolute times: `at 15:10CEST`, `at 12:00Z`, `at 15:10+02:00` (space starts a label)
+  - repeating: `every 5m`, `every monday at 18:00`, `every mon, thu 6pm`,
+    `daily at 7:30`, `every weekday at 9:00` (`each` works too)
   - optional note: `in 10m stretch`, `in 5m, water plants`, `at 15:10 team call`
     (also still accepts `(laundry)` / `"pick up kids"`)
 - **Timezone-aware** (uses local timezone by default; stores absolute UTC instants)
@@ -20,12 +22,16 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Keyboard-driven**
   - `Ctrl+N` / focus line edit → type alarm → Enter
   - `Delete` / `Ctrl+D` remove selected
-  - `Ctrl+E` edit · `Ctrl+R` restart
+  - `Ctrl+E` edit · `Ctrl+R` restart · `Ctrl+K` skip next (repeating)
   - `Space` / Enter on triggered dialog = Acknowledge
   - `Esc` hides window to tray
 - **Countdown** shown for every alarm and in the tray tooltip
 - **Current time** displayed prominently
 - Finished alarms stay in the list as **DONE** (edit/remove manually)
+- **Repeating alarms** (↻) re-arm on acknowledge instead of becoming DONE:
+  intervals count from the acknowledgement, weekly ones keep their local
+  wall-clock time across DST, and missed occurrences fire once, not once per
+  missed slot. **Skip next** drops the upcoming occurrence.
 - **Command** (expression) and **Label** (note) are separate columns
 - **Edit** via button, Ctrl+E, or double-click
 - **Restart** re-arms from the original command (button, Ctrl+R, or right-click)

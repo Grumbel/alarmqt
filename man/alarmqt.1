@@ -66,6 +66,34 @@ timezone on absolute times (no space before the zone; a space starts the note):
 Spaced names are labels:
 .B at 15:10 CEST
 uses the system zone and the label CEST.
+.SS Repeating
+.TP
+.BR every\ 5m ,\ every\ 1h30m ,\ every\ hour
+Interval alarm. After it is acknowledged it fires again after the interval,
+counted from the acknowledgement; an ignored alarm stays due instead of
+queueing more.
+.TP
+.BR every\ monday\ at\ 18:00 ,\ every\ mon,\ thu\ 6pm
+Weekly alarm at a local wall-clock time; it stays at that time across
+daylight-saving changes. Days may be full or short names, plural, and joined
+with commas,
+.BR and ,
+.B &
+or
+.BR / .
+.TP
+.BR daily\ at\ 7:30 ,\ every\ day\ at\ 7:30 ,\ every\ weekday\ at\ 9:00 ,\ weekends\ 10am
+Every day, Monday to Friday, or Saturday and Sunday.
+.PP
+.B each
+is accepted in place of
+.BR every .
+Acknowledging a repeating alarm schedules its next occurrence instead of
+marking it DONE; occurrences missed while the app was not running fire once,
+not once per missed slot.
+.B Skip next
+(context menu, Ctrl+K) drops the upcoming occurrence.
+To stop a repeating alarm, remove it.
 .SS Notes
 Text after the time expression becomes the alarm label; the command column
 keeps only the time part:
@@ -94,6 +122,9 @@ Edit the selected alarm.
 .TP
 .B Ctrl+R
 Restart the selected alarm (re-evaluate its command from now).
+.TP
+.B Ctrl+K
+Skip the next occurrence of the selected repeating alarm(s).
 .TP
 .B Delete / Ctrl+D
 Remove the selected alarm(s).
@@ -184,6 +215,13 @@ Add a relative alarm with a note:
 Add an absolute alarm:
 .RS
 .B alarmqt \(dqat 15:10\(dq
+.RE
+.TP
+Add repeating alarms:
+.RS
+.B alarmqt \(dqevery monday at 18:00 laundry\(dq
+.br
+.B alarmqt \(dqevery 30m drink water\(dq
 .RE
 .TP
 List alarms (local store or via D-Bus if a primary is running):

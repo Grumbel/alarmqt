@@ -54,17 +54,6 @@ QColor rowBackground(const Alarm& a) {
     return QColor();
 }
 
-QString statusText(const Alarm& a) {
-    if (a.acknowledged)
-        return QStringLiteral("DONE");
-    if (a.missed)
-        return QStringLiteral("MISSED");
-    if (a.triggered)
-        return QStringLiteral("DUE");
-    if (a.snoozed)
-        return QStringLiteral("SNOOZED");
-    return QStringLiteral("ACTIVE");
-}
 } // namespace
 
 MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
@@ -113,7 +102,8 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
 
     auto* inputRow = new QHBoxLayout;
     m_input = new QLineEdit;
-    m_input->setPlaceholderText(tr("in 10m stretch  ·  in 5m, water plants  ·  at 15:10 team call"));
+    m_input->setPlaceholderText(
+        tr("in 10m stretch  ·  at 15:10 team call  ·  every monday at 18:00 laundry"));
     m_input->setClearButtonEnabled(true);
     auto* addBtn = new QPushButton(tr("Add"));
     auto* editBtn = new QPushButton(tr("Edit"));
@@ -168,6 +158,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, [this]() { removeSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), this, [this]() { editSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_R), this, [this]() { restartSelected(); });
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_K), this, [this]() { skipSelected(); });
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
 
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
@@ -319,7 +310,10 @@ void MainWindow::addFromInput() {
                                 "  in 5m, water plants\n"
                                 "  at 15:10 team call\n"
                                 "  in 2h30m\n"
-                                "  at 2026-10-03 09:00")
+                                "  at 2026-10-03 09:00\n"
+                                "  every 30m drink water\n"
+                                "  every monday at 18:00 laundry\n"
+                                "  every weekday at 9:00 standup")
                                  .arg(text));
         return;
     }
@@ -389,6 +383,26 @@ void MainWindow::restartSelected() {
     }
 }
 
+void MainWindow::skipSelected() {
+    QList<QUuid> ids;
+    for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
+        auto* item = m_table->item(idx.row(), kColStatus);
+        if (!item)
+            continue;
+        const QUuid id = item->data(kRoleId).toUuid();
+        if (const Alarm* a = m_manager->alarmById(id); a && a->recurrence.isRecurring())
+            ids.append(id);
+    }
+    if (ids.isEmpty()) {
+        QMessageBox::information(this, tr("Skip next"),
+                                 tr("Select a repeating alarm to skip its next occurrence."));
+        return;
+    }
+    // skipNext() closes open notifications via alarmAcknowledged.
+    for (const QUuid& id : ids)
+        m_manager->skipNext(id);
+}
+
 void MainWindow::onTableContextMenu(const QPoint& pos) {
     const QModelIndex index = m_table->indexAt(pos);
     if (index.isValid())
@@ -397,6 +411,13 @@ void MainWindow::onTableContextMenu(const QPoint& pos) {
     QMenu menu(this);
     menu.addAction(tr("Edit…"), this, &MainWindow::editSelected);
     menu.addAction(tr("Restart"), this, &MainWindow::restartSelected);
+    bool anyRecurring = false;
+    for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
+        if (auto* item = m_table->item(idx.row(), kColStatus))
+            if (const Alarm* a = m_manager->alarmById(item->data(kRoleId).toUuid()))
+                anyRecurring |= a->recurrence.isRecurring();
+    }
+    menu.addAction(tr("Skip next"), this, &MainWindow::skipSelected)->setEnabled(anyRecurring);
     menu.addSeparator();
     menu.addAction(tr("Remove"), this, &MainWindow::removeSelected);
     menu.addAction(tr("Clear all DONE"), this, &MainWindow::clearDoneAlarms);
@@ -447,6 +468,12 @@ bool MainWindow::editAlarm(const QUuid& id) {
 
     auto* doneCheck = new QCheckBox(tr("Done (acknowledged)"));
     doneCheck->setChecked(a->acknowledged);
+    if (a->recurrence.isRecurring()) {
+        // Repeating alarms never become DONE; use "Skip next" instead.
+        doneCheck->setEnabled(false);
+        doneCheck->setToolTip(tr("Repeating alarm (%1); use Skip next or Remove")
+                                  .arg(a->recurrence.describe()));
+    }
 
     form->addRow(tr("Command"), commandEdit);
     form->addRow(tr("Label"), labelEdit);
@@ -490,6 +517,7 @@ bool MainWindow::editAlarm(const QUuid& id) {
         auto opt = AlarmManager::parse(newCmd, updated.label);
         if (opt) {
             updated.command = opt->command.isEmpty() ? newCmd : opt->command;
+            updated.recurrence = opt->recurrence;
             updated.triggerUtc = opt->triggerUtc;
             const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
             while (updated.triggerUtc <= nowUtc)
@@ -505,7 +533,9 @@ bool MainWindow::editAlarm(const QUuid& id) {
         updated.triggerUtc = local.toUTC();
     }
 
-    updated.acknowledged = doneCheck->isChecked();
+    // An unparsable new command keeps the old rule rather than silently
+    // dropping it; a repeating alarm is never DONE.
+    updated.acknowledged = doneCheck->isChecked() && !updated.recurrence.isRecurring();
     // Re-arm; if the new time is already past, the next tick fires it again.
     updated.triggered = false;
     updated.scheduledUtc = updated.triggerUtc;
@@ -572,7 +602,9 @@ void MainWindow::refreshList() {
     for (int row = 0; row < ordered.size(); ++row) {
         const Alarm& a = *ordered[row];
 
-        auto* status = setCell(row, kColStatus, statusText(a));
+        const bool recurring = a.recurrence.isRecurring();
+        auto* status = setCell(row, kColStatus,
+                               recurring ? a.statusText() + QStringLiteral(" ↻") : a.statusText());
         status->setData(kRoleId, a.id);
 
         QString remaining;
@@ -588,7 +620,11 @@ void MainWindow::refreshList() {
         // "When" is the real scheduled time; snooze only moves triggerUtc.
         const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
         setCell(row, kColWhen, whenSrc.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
-        setCell(row, kColCommand, a.command);
+        auto* command = setCell(row, kColCommand, a.command);
+        const QString repeatTip = recurring ? tr("Repeats: %1").arg(a.recurrence.describe())
+                                            : QString();
+        status->setToolTip(repeatTip);
+        command->setToolTip(repeatTip);
         setCell(row, kColLabel, a.label.isEmpty() ? QStringLiteral("—") : a.label);
 
         // Row blink for open notifications overrides static status colour.

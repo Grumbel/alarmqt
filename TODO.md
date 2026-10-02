@@ -12,12 +12,17 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Open
 
-- [ ] **Recurring alarms** — daily / weekly (and maybe custom interval). Data model already has a `repeating` flag; needs UX (edit dialog + list status), schedule logic after ack/fire, and persistence of recurrence rule.
+- [ ] Recurring alarms, follow-ups: auto-close an unanswered interval
+      notification when the next one is due; pause/resume; `until` / count
+      limits; monthly rules
 - [ ] Mute / volume for notification sound
 - [ ] Shell completions (bash/zsh/fish)
 
 ## Done recently
 
+- Recurring alarms: `every 5m`, `every monday at 18:00`, `daily at 7:30`,
+  weekdays/weekends; re-arm on ack, Skip next (Ctrl+K), DST-safe
+- Fix glued timezone parsing (`at 15:10CEST`)
 - Man page / README: D-Bus + busctl examples
 - Session D-Bus API (`org.alarmqt.AlarmQt` / `/org/alarmqt/AlarmQt`)
 - `--list` reply protocol (secondary prints primary's alarm list)
