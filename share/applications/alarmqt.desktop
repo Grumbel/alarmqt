@@ -1,9 +1,25 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=AlarmQt
-Comment=Simple system-tray alarms
-Exec=alarmqt
+GenericName=Alarm Clock
+Comment=Keyboard-friendly system-tray alarms and reminders
+Exec=alarmqt %u
 Icon=alarmqt
 Terminal=false
-Categories=Utility;Clock;
+Categories=Utility;Clock;Qt;
+Keywords=alarm;timer;reminder;clock;notify;schedule;
 StartupNotify=false
+StartupWMClass=alarmqt
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+Actions=AddAlarm;Quit;
+
+[Desktop Action AddAlarm]
+Name=Add alarm…
+Exec=alarmqt --raise
+
+[Desktop Action Quit]
+Name=Quit
+Exec=alarmqt --quit

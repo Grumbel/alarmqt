@@ -21,6 +21,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     , m_manager(manager)
 {
     setWindowTitle(tr("AlarmQt"));
+    setWindowIcon(QIcon(QStringLiteral(":/icons/alarm.svg")));
     setMinimumSize(420, 320);
     resize(480, 400);
 

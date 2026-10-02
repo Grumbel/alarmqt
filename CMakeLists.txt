@@ -10,7 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg)
 
 add_executable(alarmqt
   src/main.cpp
@@ -28,13 +28,19 @@ target_link_libraries(alarmqt PRIVATE
   Qt6::Gui
   Qt6::Widgets
   Qt6::Network
+  Qt6::Svg
 )
 
-install(TARGETS alarmqt RUNTIME DESTINATION bin)
+include(GNUInstallDirs)
 
-# Optional desktop integration
+install(TARGETS alarmqt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 install(FILES share/applications/alarmqt.desktop
-        DESTINATION share/applications)
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+
 install(FILES icons/alarm.svg
-        DESTINATION share/icons/hicolor/scalable/apps
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
         RENAME alarmqt.svg)
+
+install(FILES share/metainfo/com.github.grumbel.alarmqt.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)

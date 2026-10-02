@@ -45,6 +45,16 @@ alarmqt --quit
 - CMake ≥ 3.16
 - C++20
 
+## Desktop integration
+
+Installed files (via CMake / Nix):
+
+- `share/applications/alarmqt.desktop`
+- `share/icons/hicolor/scalable/apps/alarmqt.svg`
+- `share/metainfo/com.github.grumbel.alarmqt.metainfo.xml`
+
+The app sets `QGuiApplication::setDesktopFileName("alarmqt")` so the tray and window match the desktop entry (icon, notifications, single-window hints).
+
 ## License
 
 GPL-3.0-or-later

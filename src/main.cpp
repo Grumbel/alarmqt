@@ -6,6 +6,7 @@
 #include "SingleInstance.h"
 
 #include <QApplication>
+#include <QIcon>
 #include <QCommandLineParser>
 #include <QDebug>
 #include <iostream>
@@ -16,8 +17,14 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
-    QApplication::setOrganizationName(QStringLiteral("alarmqt"));
+    QApplication::setOrganizationName(QStringLiteral("Grumbel"));
+    QApplication::setOrganizationDomain(QStringLiteral("github.com.grumbel"));
+    QApplication::setDesktopFileName(QStringLiteral("alarmqt"));
     QApplication::setQuitOnLastWindowClosed(false); // tray keeps us alive
+
+    // Application / window icon (tray uses the same resource)
+    const QIcon appIcon(QStringLiteral(":/icons/alarm.svg"));
+    QApplication::setWindowIcon(appIcon);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Simple system-tray alarm app"));
@@ -28,6 +35,7 @@ int main(int argc, char* argv[]) {
                                  QStringLiteral("[alarm]"));
     parser.addOption({{"q", "quit"}, QStringLiteral("Quit the running instance")});
     parser.addOption({{"l", "list"}, QStringLiteral("List active alarms (primary only)")});
+    parser.addOption({{"r", "raise"}, QStringLiteral("Raise the existing window")});
     parser.process(app);
 
     const QStringList pos = parser.positionalArguments();
@@ -36,6 +44,8 @@ int main(int argc, char* argv[]) {
         message = QStringLiteral("--quit");
     else if (parser.isSet(QStringLiteral("list")))
         message = QStringLiteral("--list");
+    else if (parser.isSet(QStringLiteral("raise")))
+        message = QStringLiteral("--raise");
     else if (!pos.isEmpty())
         message = pos.join(QLatin1Char(' '));
     else

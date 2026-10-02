@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component type="desktop-application">
+  <id>com.github.grumbel.alarmqt</id>
+  <name>AlarmQt</name>
+  <summary>Keyboard-friendly system-tray alarms and reminders</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer_name>Ingo Ruhnke</developer_name>
+  <url type="homepage">https://github.com/Grumbel/alarmqt</url>
+  <url type="bugtracker">https://github.com/Grumbel/alarmqt/issues</url>
+  <description>
+    <p>
+      AlarmQt is a small Qt6 system-tray alarm app for Linux. Set relative
+      (“in 5m”) or absolute (“at 15:10”) reminders from the keyboard or CLI.
+      Alarms keep notifying until you acknowledge or snooze them.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Relative and absolute time parsing</li>
+      <li>Timezone-aware (stores UTC, shows local time)</li>
+      <li>System tray with countdown tooltip</li>
+      <li>Single-instance; second launch raises the window or adds an alarm</li>
+      <li>Persistent alarms across restarts</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">alarmqt.desktop</launchable>
+  <provides>
+    <binary>alarmqt</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Clock</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-02"/>
+  </releases>
+</component>
