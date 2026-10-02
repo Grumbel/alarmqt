@@ -4,7 +4,7 @@
 
 - **Work-line base:** `071e920` (Initial checkin)
 - **Current tip:** HEAD after full-height notify strips (see latest bundle)
-- **Next bundle NNN:** 025
+- **Next bundle NNN:** 026
 
 ## Status
 
