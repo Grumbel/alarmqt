@@ -3,8 +3,6 @@
 
 #include "SingleInstance.h"
 
-#include <QLocalSocket>
-
 #include <memory>
 
 SingleInstance::SingleInstance(const QString& key, QObject* parent)
@@ -48,10 +46,12 @@ void SingleInstance::onNewConnection() {
                 return;
             *handled = true;
             const QString message = QString::fromUtf8(*buffer).trimmed();
+            // Keep the socket open so the handler can write a reply (e.g. --list).
+            // Close after the signal returns (direct connection, same thread).
+            if (!message.isEmpty())
+                emit messageReceived(message, sock);
             sock->disconnectFromServer();
             sock->deleteLater();
-            if (!message.isEmpty())
-                emit messageReceived(message);
         };
         auto consume = [sock, buffer, finish]() {
             buffer->append(sock->readAll());
@@ -71,7 +71,7 @@ void SingleInstance::onNewConnection() {
     }
 }
 
-bool SingleInstance::sendMessage(const QString& key, const QString& message) {
+bool SingleInstance::sendMessage(const QString& key, const QString& message, QString* reply) {
     QLocalSocket socket;
     socket.connectToServer(key);
     if (!socket.waitForConnected(1000))
@@ -83,11 +83,30 @@ bool SingleInstance::sendMessage(const QString& key, const QString& message) {
     if (socket.write(payload) != payload.size())
         return false;
     socket.flush();
-    socket.waitForBytesWritten(1000);
-    // Give the server a moment to read before we tear down the socket
-    socket.waitForDisconnected(200);
-    socket.disconnectFromServer();
-    if (socket.state() != QLocalSocket::UnconnectedState)
+    if (!socket.waitForBytesWritten(1000))
+        return false;
+
+    if (!reply) {
+        // Fire-and-forget: allow the server a moment to read, then leave.
         socket.waitForDisconnected(200);
+        socket.disconnectFromServer();
+        if (socket.state() != QLocalSocket::UnconnectedState)
+            socket.waitForDisconnected(200);
+        return true;
+    }
+
+    // Wait for the full reply until the server closes the connection.
+    QByteArray body;
+    while (socket.state() == QLocalSocket::ConnectedState
+           || socket.bytesAvailable() > 0) {
+        if (socket.bytesAvailable() == 0) {
+            if (!socket.waitForReadyRead(3000))
+                break;
+        }
+        body.append(socket.readAll());
+    }
+    // Drain anything left after disconnect
+    body.append(socket.readAll());
+    *reply = QString::fromUtf8(body);
     return true;
 }

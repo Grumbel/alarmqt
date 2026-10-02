@@ -17,14 +17,35 @@
 
 static const QString kAppKey = QStringLiteral("alarmqt-single-instance-v1");
 
+static QString statusLabel(const Alarm& a) {
+    if (a.acknowledged)
+        return QStringLiteral("DONE");
+    if (a.missed)
+        return QStringLiteral("MISSED");
+    if (a.triggered)
+        return QStringLiteral("DUE");
+    if (a.snoozed)
+        return QStringLiteral("SNOOZED");
+    if (a.isDue())
+        return QStringLiteral("DUE");
+    return QStringLiteral("ACTIVE");
+}
+
 static void printAlarmList(const AlarmManager& manager, bool includeDone) {
     for (const auto& a : manager.alarms()) {
         if (!includeDone && a.acknowledged)
             continue;
-        const auto local = a.triggerUtc.toLocalTime();
-        const char* st = a.acknowledged ? "DONE" : (a.isDue() ? "DUE" : "ACTIVE");
-        std::cout << st << "  "
-                  << (a.acknowledged ? "—" : a.remainingString().toStdString()) << "  "
+        const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
+        const auto local = whenSrc.toLocalTime();
+        QString remaining;
+        if (a.acknowledged)
+            remaining = QStringLiteral("—");
+        else if (a.snoozed)
+            remaining = QStringLiteral("snooze %1").arg(a.remainingString());
+        else
+            remaining = a.remainingString();
+        std::cout << statusLabel(a).toStdString() << "  "
+                  << remaining.toStdString() << "  "
                   << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")).toStdString()
                   << "  [" << a.command.toStdString() << "]"
                   << (a.label.isEmpty() ? "" : (" " + a.label.toStdString()))
@@ -35,24 +56,24 @@ static void printAlarmList(const AlarmManager& manager, bool includeDone) {
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
+    QApplication::setApplicationDisplayName(QStringLiteral("AlarmQt"));
     QApplication::setApplicationVersion(QStringLiteral(ALARMQT_VERSION));
     QApplication::setOrganizationName(QStringLiteral("Grumbel"));
-    QApplication::setOrganizationDomain(QStringLiteral("alarmqt"));
-    QApplication::setDesktopFileName(QStringLiteral("alarmqt"));
-    QApplication::setQuitOnLastWindowClosed(false);
-
-    const QIcon appIcon(QStringLiteral(":/icons/alarm.svg"));
-    QApplication::setWindowIcon(appIcon);
+    QApplication::setOrganizationDomain(QStringLiteral("grumbel.com"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("alarmqt"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/icons/alarm.svg")));
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("Simple system-tray alarm app"));
+    parser.setApplicationDescription(
+        QStringLiteral("Keyboard-friendly system-tray alarm / reminder"));
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addPositionalArgument(QStringLiteral("alarm"),
-                                 QStringLiteral("Alarm expression, e.g. \"in 5m\" or \"at 15:10\""),
-                                 QStringLiteral("[alarm]"));
+    parser.addPositionalArgument(QStringLiteral("expression"),
+                                 QStringLiteral("Alarm expression (e.g. \"in 5m kitchen\")"),
+                                 QStringLiteral("[expression]"));
     parser.addOption({{"q", "quit"}, QStringLiteral("Quit the running instance")});
-    parser.addOption({{"l", "list"}, QStringLiteral("List alarms (primary prints; secondary asks primary)")});
+    parser.addOption({{"l", "list"},
+                      QStringLiteral("List alarms (primary prints; secondary asks primary)")});
     parser.addOption({{"r", "raise"}, QStringLiteral("Raise the existing window")});
     parser.process(app);
 
@@ -76,10 +97,19 @@ int main(int argc, char* argv[]) {
     SingleInstance instance(kAppKey);
 
     if (!instance.isPrimary()) {
+        if (wantList) {
+            QString reply;
+            if (SingleInstance::sendMessage(kAppKey, message, &reply)) {
+                std::cout << reply.toStdString();
+                if (!reply.isEmpty() && !reply.endsWith(QLatin1Char('\n')))
+                    std::cout << '\n';
+                return 0;
+            }
+            qWarning("Could not contact primary instance for --list");
+            return 1;
+        }
         if (SingleInstance::sendMessage(kAppKey, message)) {
-            if (wantList)
-                std::cout << "Sent --list to primary instance\n";
-            else if (!wantQuit && !wantRaise && !pos.isEmpty())
+            if (!wantQuit && !wantRaise && !pos.isEmpty())
                 std::cout << "Sent alarm to running instance: " << message.toStdString() << "\n";
             return 0;
         }

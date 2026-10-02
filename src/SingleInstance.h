@@ -16,11 +16,17 @@ public:
 
     bool isPrimary() const { return m_isPrimary; }
 
-    // Send a message to the primary instance (call from secondary)
-    static bool sendMessage(const QString& key, const QString& message);
+    /** Send a one-line command to the primary.
+     *  If @p reply is non-null, wait for a response body (until the server
+     *  closes the socket) and store it there. */
+    static bool sendMessage(const QString& key, const QString& message,
+                            QString* reply = nullptr);
 
 signals:
-    void messageReceived(const QString& message);
+    /** Emitted when a secondary sent a complete newline-terminated command.
+     *  @p socket is still open: write a reply then return; the server closes
+     *  it afterward. Fire-and-forget commands may ignore the socket. */
+    void messageReceived(const QString& message, QLocalSocket* socket);
 
 private slots:
     void onNewConnection();
