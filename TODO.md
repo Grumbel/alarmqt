@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-003.1-fix-qshortcut-qt611-071e920.bundle`
-- **Next bundle NNN:** 004
+- **Current tip:** HEAD of bundle `alarmqt-004.1-desktop-integration-071e920.bundle`
+- **Next bundle NNN:** 005
 
 ## Done in this line
 
@@ -13,8 +13,8 @@
 - REUSE / SPDX / LICENSE (GPL-3.0-or-later)
 - Re-notify loop while alarm is triggered and unacknowledged
 - Prune acknowledged alarms on load/save
-- flake homepage + README wording
 - Fix QShortcut compile error on Qt 6.11 (member ptr → lambda)
+- Cute anime SVG icon; full Linux desktop integration (.desktop, AppStream, hicolor icon install, setDesktopFileName, --raise)
 
 ## Open / nice-to-have
 
@@ -24,8 +24,8 @@
 - [ ] Tray icon tint when alarm is due soon
 - [ ] `--list` should print from primary via reply protocol (currently secondary only hints)
 - [ ] Unit tests for the time parser
-- [ ] Install icon/desktop file paths verified under Nix
-- [ ] Confirm full build still green after Qt 6.11 fix (user was mid-build)
+- [ ] PNG fallbacks for icon themes that ignore SVG (optional)
+- [ ] `update-desktop-database` / icon cache note for non-Nix packaging
 
 ## Known limitations
 
@@ -36,7 +36,7 @@
 ## Handoff
 
 ```bash
-git pull /path/to/alarmqt-003.1-fix-qshortcut-qt611-071e920.bundle HEAD
+git pull /path/to/alarmqt-004.1-desktop-integration-071e920.bundle HEAD
 ```
 
 Requires base `071e920`. Read `AGENTS.md` and this file.
