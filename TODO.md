@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-004.1-desktop-integration-071e920.bundle`
-- **Next bundle NNN:** 005
+- **Current tip:** HEAD of bundle `alarmqt-005.1-short-appstream-id-071e920.bundle`
+- **Next bundle NNN:** 006
 
 ## Done in this line
 
@@ -36,7 +36,7 @@
 ## Handoff
 
 ```bash
-git pull /path/to/alarmqt-004.1-desktop-integration-071e920.bundle HEAD
+git pull /path/to/alarmqt-005.1-short-appstream-id-071e920.bundle HEAD
 ```
 
 Requires base `071e920`. Read `AGENTS.md` and this file.
