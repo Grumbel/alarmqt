@@ -26,6 +26,7 @@ public:
     static std::optional<Alarm> parse(const QString& input, const QString& label = {});
 
     void add(const Alarm& a);
+    void update(const Alarm& a); // replace existing by id
     void remove(const QUuid& id);
     void acknowledge(const QUuid& id);
     void snooze(const QUuid& id, int minutes = -1); // -1 → use alarm's default

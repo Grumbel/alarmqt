@@ -30,18 +30,23 @@ protected:
 
 private slots:
     void refreshList();
+    void updateClock();
     void onAlarmTriggered(const Alarm& a);
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
     void addFromInput();
     void removeSelected();
+    void editSelected();
+    void onRowDoubleClicked(int row, int column);
     void updateTray();
     void renotifyTriggered();
 
 private:
     void createTray();
     void showNotification(const Alarm& a);
+    bool editAlarm(const QUuid& id);
 
     AlarmManager* m_manager;
+    QLabel* m_clock = nullptr;
     QTableWidget* m_table = nullptr;
     QLineEdit* m_input = nullptr;
     QLabel* m_status = nullptr;

@@ -151,6 +151,16 @@ void AlarmManager::add(const Alarm& a) {
     emit alarmsChanged();
 }
 
+void AlarmManager::update(const Alarm& a) {
+    if (auto* existing = alarmById(a.id)) {
+        *existing = a;
+        std::sort(m_alarms.begin(), m_alarms.end(),
+                  [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+        save();
+        emit alarmsChanged();
+    }
+}
+
 void AlarmManager::remove(const QUuid& id) {
     auto it = std::remove_if(m_alarms.begin(), m_alarms.end(),
                              [&](const Alarm& a) { return a.id == id; });
@@ -177,7 +187,7 @@ void AlarmManager::snooze(const QUuid& id, int minutes) {
         a->triggerUtc = QDateTime::currentDateTimeUtc().addSecs(m * 60);
         a->triggered = false;
         a->acknowledged = false;
-        a->label = QStringLiteral("%1 (snoozed %2m)").arg(a->label).arg(m);
+        // keep user label; only clear done/triggered state
         std::sort(m_alarms.begin(), m_alarms.end(),
                   [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
         save();
@@ -230,9 +240,7 @@ void AlarmManager::load() {
     for (const auto& v : doc.array()) {
         if (!v.isObject())
             continue;
-        Alarm a = Alarm::fromJson(v.toObject());
-        if (!a.acknowledged)
-            m_alarms.append(a);
+        m_alarms.append(Alarm::fromJson(v.toObject()));
     }
     std::sort(m_alarms.begin(), m_alarms.end(),
               [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
@@ -240,11 +248,8 @@ void AlarmManager::load() {
 
 void AlarmManager::save() const {
     QJsonArray arr;
-    for (const auto& a : m_alarms) {
-        if (a.acknowledged)
-            continue; // drop finished alarms
+    for (const auto& a : m_alarms)
         arr.append(a.toJson());
-    }
     QFile f(storagePath());
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
         f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
