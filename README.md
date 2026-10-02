@@ -63,6 +63,12 @@ Installed files (via CMake / Nix):
 
 The app sets `QGuiApplication::setDesktopFileName("alarmqt")` so the tray and window match the desktop entry (icon, notifications, single-window hints).
 
+## Version
+
+`VERSION` is the only source of truth. Development trees use a `-dev` suffix
+(e.g. `0.1.0-dev`). Nix appends `.{revCount}+g{shortRev}` for dev builds.
+`alarmqt --version` prints the full string.
+
 ## License
 
 GPL-3.0-or-later

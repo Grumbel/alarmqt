@@ -11,12 +11,16 @@
 #include <QDebug>
 #include <iostream>
 
+#ifndef ALARMQT_VERSION
+#  define ALARMQT_VERSION "0.0.0-unknown"
+#endif
+
 static const QString kAppKey = QStringLiteral("alarmqt-single-instance-v1");
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QApplication::setApplicationVersion(QStringLiteral(ALARMQT_VERSION));
     QApplication::setOrganizationName(QStringLiteral("Grumbel"));
     QApplication::setOrganizationDomain(QStringLiteral("alarmqt"));
     QApplication::setDesktopFileName(QStringLiteral("alarmqt"));

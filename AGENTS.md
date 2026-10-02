@@ -47,3 +47,11 @@ alarmqt --quit
 nix build
 nix run . -- "in 1m"
 ```
+
+
+## Versioning
+
+- Sole source of truth: top-level `VERSION` file (`0.1.0-dev` on the main branch).
+- Dev builds (Nix): `0.1.0-dev.{revCount}+g{shortRev}` via `-DPROJECT_VERSION_FULL=…`.
+- Release: drop `-dev`, commit, tag `vX.Y.Z`, then bump to next `*-dev`.
+- Application exposes full string as `ALARMQT_VERSION` / `QApplication::applicationVersion()`.

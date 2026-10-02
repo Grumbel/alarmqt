@@ -14,6 +14,16 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
+
+        versionBase = lib.strings.removeSuffix "\n" (builtins.readFile ./VERSION);
+        gitRev = "${self.shortRev or self.dirtyShortRev or "dirty"}";
+        isDev = lib.strings.hasInfix "-dev" versionBase;
+        version =
+          if isDev then
+            "${versionBase}.${toString (self.revCount or 0)}+g${gitRev}"
+          else
+            versionBase;
+
         # Qt Multimedia dlopens these at runtime (not linked into the binary).
         mediaRuntimeLibs = with pkgs; [
           pipewire
@@ -22,7 +32,7 @@
       in {
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "alarmqt";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
@@ -44,6 +54,7 @@
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
+            "-DPROJECT_VERSION_FULL=${version}"
           ];
 
           meta = with lib; {
@@ -66,7 +77,6 @@
             gdb
             clang-tools
           ];
-          # Same runtime path when developing via `nix develop`
           LD_LIBRARY_PATH = lib.makeLibraryPath mediaRuntimeLibs;
         };
       });
