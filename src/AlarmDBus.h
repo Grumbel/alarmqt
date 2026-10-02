@@ -41,7 +41,7 @@ public slots:
     /** Parse and add an expression. Empty string on success; error text otherwise. */
     Q_SCRIPTABLE QString Add(const QString& expression);
     Q_SCRIPTABLE void Raise();
-    Q_SCRIPTABLE Q_NOREPLY void Quit();
+    Q_SCRIPTABLE void Quit();
     Q_SCRIPTABLE int ClearDone();
     Q_SCRIPTABLE QString Version();
 
