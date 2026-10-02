@@ -360,6 +360,21 @@ bool MainWindow::editAlarm(const QUuid& id) {
     form->addRow(tr("When"), whenEdit);
     form->addRow(QString(), doneCheck);
 
+    auto* applyCmdBtn = new QPushButton(tr("Apply command → When"));
+    form->addRow(QString(), applyCmdBtn);
+    QObject::connect(applyCmdBtn, &QPushButton::clicked, &dlg, [=]() {
+        const QString cmd = commandEdit->text().trimmed();
+        auto opt = AlarmManager::parse(cmd, labelEdit->text().trimmed());
+        if (!opt) {
+            QMessageBox::warning(&dlg, tr("Parse error"),
+                                 tr("Could not parse command: %1").arg(cmd));
+            return;
+        }
+        whenEdit->setDateTime(opt->triggerUtc.toLocalTime());
+        if (!opt->command.isEmpty())
+            commandEdit->setText(opt->command);
+    });
+
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     form->addRow(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
@@ -369,16 +384,37 @@ bool MainWindow::editAlarm(const QUuid& id) {
         return false;
 
     Alarm updated = *a;
-    updated.command = commandEdit->text().trimmed();
+    const QString newCmd = commandEdit->text().trimmed();
+    updated.command = newCmd;
     updated.label = labelEdit->text().trimmed();
-    QDateTime local = whenEdit->dateTime();
-    local.setTimeZone(QTimeZone::systemTimeZone());
-    updated.triggerUtc = local.toUTC();
+
+    // If command changed, re-parse into trigger; else keep When field
+    if (newCmd != a->command && !newCmd.isEmpty()) {
+        auto opt = AlarmManager::parse(newCmd, updated.label);
+        if (opt) {
+            updated.command = opt->command.isEmpty() ? newCmd : opt->command;
+            updated.triggerUtc = opt->triggerUtc;
+            const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
+            while (updated.triggerUtc <= nowUtc)
+                updated.triggerUtc = updated.triggerUtc.addDays(1);
+        } else {
+            QDateTime local = whenEdit->dateTime();
+            local.setTimeZone(QTimeZone::systemTimeZone());
+            updated.triggerUtc = local.toUTC();
+        }
+    } else {
+        QDateTime local = whenEdit->dateTime();
+        local.setTimeZone(QTimeZone::systemTimeZone());
+        updated.triggerUtc = local.toUTC();
+    }
+
     updated.acknowledged = doneCheck->isChecked();
     if (updated.acknowledged)
         updated.triggered = false;
     else if (updated.triggerUtc > QDateTime::currentDateTimeUtc())
         updated.triggered = false;
+    else
+        updated.triggered = false; // past → let tick fire as due
 
     m_manager->update(updated);
     if (updated.acknowledged) {

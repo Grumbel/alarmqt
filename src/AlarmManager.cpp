@@ -212,7 +212,7 @@ bool AlarmManager::restart(const QUuid& id) {
     if (!a)
         return false;
 
-    // Prefer re-evaluating the original command from now
+    const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
     QString expr = a->command;
     if (expr.isEmpty())
         expr = a->label;
@@ -221,8 +221,10 @@ bool AlarmManager::restart(const QUuid& id) {
         auto opt = parse(expr, a->label);
         if (opt) {
             a->command = opt->command.isEmpty() ? expr : opt->command;
-            // keep existing user label
             a->triggerUtc = opt->triggerUtc;
+            // Never schedule in the past: roll full datetimes forward day by day
+            while (a->triggerUtc <= nowUtc)
+                a->triggerUtc = a->triggerUtc.addDays(1);
             a->acknowledged = false;
             a->triggered = false;
             std::sort(m_alarms.begin(), m_alarms.end(),
@@ -234,7 +236,7 @@ bool AlarmManager::restart(const QUuid& id) {
     }
 
     // Fallback: fire again in snoozeMinutes
-    a->triggerUtc = QDateTime::currentDateTimeUtc().addSecs(a->snoozeMinutes * 60);
+    a->triggerUtc = nowUtc.addSecs(a->snoozeMinutes * 60);
     a->acknowledged = false;
     a->triggered = false;
     std::sort(m_alarms.begin(), m_alarms.end(),
@@ -293,6 +295,13 @@ void AlarmManager::load() {
     }
     std::sort(m_alarms.begin(), m_alarms.end(),
               [](const Alarm& x, const Alarm& y) { return x.triggerUtc < y.triggerUtc; });
+
+    // After restart, re-arm due alarms so tick() will notify again
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (auto& a : m_alarms) {
+        if (!a.acknowledged && a.isDue(now))
+            a.triggered = false;
+    }
 }
 
 void AlarmManager::save() const {

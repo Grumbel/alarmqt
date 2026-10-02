@@ -9,7 +9,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
   - `at 15:10`, `at 2026-10-03 09:00`
   - optional note: `in 5m (kitchen)`, `in 10m "tea"`
 - **Timezone-aware** (uses local timezone by default; stores absolute UTC instants)
-- **Persistent** – alarms survive restarts (JSON in `~/.local/share/alarmqt/alarms.json`)
+- **Persistent** – alarms survive restarts (JSON under Qt AppDataLocation, typically `~/.local/share/Grumbel/alarmqt/alarms.json`)
 - **Repeats until acknowledged** – always-on-top flashing dialog + tray balloon every 30 s until Ack / Snooze
 - **System tray** – icon shows next alarm countdown; left-click toggles window, right-click menu
 - **Single-instance** – starting the binary again focuses the existing window / sends CLI commands
