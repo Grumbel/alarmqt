@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("expression"),
-                                 QStringLiteral("Alarm expression (e.g. \"in 5m kitchen\")"),
+                                 QStringLiteral("Alarm expression (e.g. \"in 10m stretch\")"),
                                  QStringLiteral("[expression]"));
     parser.addOption({{"q", "quit"}, QStringLiteral("Quit the running instance")});
     parser.addOption({{"l", "list"},
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
                       << "  (in " << opt->remainingString().toStdString() << ")\n";
         } else {
             std::cerr << "Could not parse alarm: " << expr.toStdString() << "\n"
-                      << "Examples: in 5m kitchen | in 5m, tea | at 15:10 standup\n";
+                      << "Examples: in 10m stretch | in 5m, water plants | at 15:10 team call\n";
             return 1;
         }
     }

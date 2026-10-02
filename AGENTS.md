@@ -44,7 +44,7 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 ```
 alarmqt                  # raise
 alarmqt "in 5m"          # add
-alarmqt "in 5m kitchen"
+alarmqt "in 10m stretch"
 alarmqt "at 15:10"
 alarmqt --list
 alarmqt --quit

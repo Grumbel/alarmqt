@@ -11,7 +11,7 @@
 struct Alarm {
     QUuid id;
     QString command;         // original time expression, e.g. "in 5m" or "at 15:10"
-    QString label;           // optional user note, e.g. "kitchen" (may be empty)
+    QString label;           // optional user note, e.g. "stretch" (may be empty)
     QDateTime triggerUtc;    // next fire time (moves on snooze)
     QDateTime scheduledUtc;  // intended "real" alarm time (unchanged by snooze)
     bool repeating = false;  // currently unused (future)

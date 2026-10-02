@@ -60,16 +60,16 @@ Text after the time expression becomes the alarm label; the command column
 keeps only the time part:
 .PP
 .RS
-.B in 5m kitchen
+.B in 10m stretch
 .br
-.B in 5m, tea
+.B in 5m, water plants
 .br
-.B at 15:10 standup
+.B at 15:10 team call
 .RE
 .PP
 Parentheses and quotes still work:
-.BR "in 5m (kitchen)" ,
-.BR "in 5m \(dqtea\(dq" .
+.BR "in 5m (laundry)" ,
+.BR "in 10m \(dqpick up kids\(dq" .
 .SH KEYBOARD
 .TP
 .B Ctrl+N
@@ -136,7 +136,7 @@ Examples:
 .nf
 .B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt List
 .B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt ListLines
-.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Add s \(dqin 5m tea\(dq
+.B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Add s \(dqin 10m stretch\(dq
 .B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Raise
 .B busctl \-\-user call org.alarmqt.AlarmQt /org/alarmqt/AlarmQt org.alarmqt.AlarmQt Quit
 .fi
@@ -166,7 +166,7 @@ Start or raise the app:
 .TP
 Add a relative alarm with a note:
 .RS
-.B alarmqt \(dqin 5m kitchen\(dq
+.B alarmqt \(dqin 10m stretch\(dq
 .RE
 .TP
 Add an absolute alarm:

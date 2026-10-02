@@ -113,7 +113,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
 
     auto* inputRow = new QHBoxLayout;
     m_input = new QLineEdit;
-    m_input->setPlaceholderText(tr("in 5m kitchen  ·  in 5m, tea  ·  at 15:10 standup"));
+    m_input->setPlaceholderText(tr("in 10m stretch  ·  in 5m, water plants  ·  at 15:10 team call"));
     m_input->setClearButtonEnabled(true);
     auto* addBtn = new QPushButton(tr("Add"));
     auto* editBtn = new QPushButton(tr("Edit"));
@@ -315,9 +315,9 @@ void MainWindow::addFromInput() {
                              tr("Could not understand: “%1”\n\n"
                                 "Examples:\n"
                                 "  in 5m\n"
-                                "  in 5m kitchen\n"
-                                "  in 5m, tea\n"
-                                "  at 15:10 standup\n"
+                                "  in 10m stretch\n"
+                                "  in 5m, water plants\n"
+                                "  at 15:10 team call\n"
                                 "  in 2h30m\n"
                                 "  at 2026-10-03 09:00")
                                  .arg(text));
