@@ -3,12 +3,14 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD of bundle `alarmqt-020.1-parser-tests-071e920.bundle`
-- **Next bundle NNN:** 021
+- **Current tip:** HEAD after missed/snooze/notification work (see latest bundle)
+- **Next bundle NNN:** 022
 
 ## Status
 
 v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `nix build` check phase).
+
+Recent: missed-alarm indication, SNOOZED status with separate scheduled vs snooze time, faster alternating black/red notification squares, table row blink until ack.
 
 ## Open
 
@@ -19,11 +21,11 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
-- Parser unit tests (Qt Test)
+- Missed alarms (app not running), SNOOZED status, notification blink redesign, row blink
+- Parser unit tests (Qt Test) + American 12-hour coverage
 - Man page, friendly notes, verification fixes, VERSION scheme
+- Resizable/reorderable table columns
 
 ## Handoff
 
-```bash
-git pull /path/to/alarmqt-020.1-parser-tests-071e920.bundle HEAD
-```
+Apply the latest `alarmqt-021.*.bundle` from artifacts (cumulative from `071e920`).
