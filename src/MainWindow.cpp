@@ -5,6 +5,7 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QResizeEvent>
 #include <QDateTimeEdit>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -25,6 +26,8 @@
 #include <QBrush>
 #include <QColor>
 #include <QFont>
+#include <QFontMetrics>
+#include <QSizePolicy>
 #include <QStatusBar>
 #include <QLocalSocket>
 
@@ -94,8 +97,12 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
 
     m_clock = new QLabel;
     m_clock->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    m_clock->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_clock->setMinimumWidth(0);
     QFont clockFont = font();
-    clockFont.setPointSize(clockFont.pointSize() + 14);
+    m_clockMaxPointSize = clockFont.pointSize() + 14;
+    m_clockMinPointSize = std::max(9, font().pointSize());
+    clockFont.setPointSize(m_clockMaxPointSize);
     clockFont.setBold(true);
     m_clock->setFont(clockFont);
     m_clock->setStyleSheet(QStringLiteral("padding: 4px 0;"));
@@ -207,6 +214,39 @@ MainWindow::~MainWindow() {
 void MainWindow::updateClock() {
     const QDateTime now = QDateTime::currentDateTime();
     m_clock->setText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss  t")));
+    fitClockFont();
+}
+
+void MainWindow::fitClockFont() {
+    if (!m_clock)
+        return;
+    // Available width inside the label (account for stylesheet padding).
+    const int available = m_clock->contentsRect().width();
+    if (available <= 0)
+        return;
+
+    const QString text = m_clock->text();
+    if (text.isEmpty())
+        return;
+
+    QFont f = m_clock->font();
+    f.setBold(true);
+    int size = m_clockMaxPointSize;
+    f.setPointSize(size);
+    while (size > m_clockMinPointSize) {
+        const QFontMetrics fm(f);
+        if (fm.horizontalAdvance(text) <= available)
+            break;
+        --size;
+        f.setPointSize(size);
+    }
+    if (m_clock->font().pointSize() != size)
+        m_clock->setFont(f);
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+    fitClockFont();
 }
 
 void MainWindow::createTray() {
