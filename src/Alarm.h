@@ -12,11 +12,14 @@ struct Alarm {
     QUuid id;
     QString command;         // original time expression, e.g. "in 5m" or "at 15:10"
     QString label;           // optional user note, e.g. "kitchen" (may be empty)
-    QDateTime triggerUtc;    // absolute UTC instant
+    QDateTime triggerUtc;    // next fire time (moves on snooze)
+    QDateTime scheduledUtc;  // intended "real" alarm time (unchanged by snooze)
     bool repeating = false;  // currently unused (future)
     int snoozeMinutes = 5;
     bool acknowledged = false;
     bool triggered = false;
+    bool snoozed = false;    // triggerUtc is a snooze deferral of scheduledUtc
+    bool missed = false;     // was due while the app was not running
 
     QJsonObject toJson() const;
     static Alarm fromJson(const QJsonObject& obj);

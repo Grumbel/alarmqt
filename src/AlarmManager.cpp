@@ -239,8 +239,11 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     else
         a.label = note; // may be empty
     a.triggerUtc = triggerLocal.toUTC();
+    a.scheduledUtc = a.triggerUtc;
     a.acknowledged = false;
     a.triggered = false;
+    a.snoozed = false;
+    a.missed = false;
     return a;
 }
 
@@ -279,6 +282,8 @@ void AlarmManager::acknowledge(const QUuid& id) {
     if (auto* a = alarmById(id)) {
         a->acknowledged = true;
         a->triggered = false;
+        a->snoozed = false;
+        a->missed = false;
         save();
         emit alarmAcknowledged(id);
         emit alarmsChanged();
@@ -288,10 +293,15 @@ void AlarmManager::acknowledge(const QUuid& id) {
 void AlarmManager::snooze(const QUuid& id, int minutes) {
     if (auto* a = alarmById(id)) {
         const int m = minutes > 0 ? minutes : a->snoozeMinutes;
+        // Keep scheduledUtc as the original "real" alarm time; only move the
+        // next fire (triggerUtc). Mark as snoozed so the UI can show both.
+        if (!a->scheduledUtc.isValid())
+            a->scheduledUtc = a->triggerUtc;
         a->triggerUtc = QDateTime::currentDateTimeUtc().addSecs(m * 60);
         a->triggered = false;
         a->acknowledged = false;
-        // keep user label; only clear done/triggered state
+        a->snoozed = true;
+        a->missed = false;
         sortAlarms();
         save();
         emit alarmsChanged();
@@ -329,8 +339,11 @@ bool AlarmManager::restart(const QUuid& id) {
             // Never schedule in the past: roll full datetimes forward day by day
             while (a->triggerUtc <= nowUtc)
                 a->triggerUtc = a->triggerUtc.addDays(1);
+            a->scheduledUtc = a->triggerUtc;
             a->acknowledged = false;
             a->triggered = false;
+            a->snoozed = false;
+            a->missed = false;
             sortAlarms();
             save();
             emit alarmsChanged();
@@ -340,8 +353,11 @@ bool AlarmManager::restart(const QUuid& id) {
 
     // Fallback: fire again in snoozeMinutes
     a->triggerUtc = nowUtc.addSecs(a->snoozeMinutes * 60);
+    a->scheduledUtc = a->triggerUtc;
     a->acknowledged = false;
     a->triggered = false;
+    a->snoozed = false;
+    a->missed = false;
     sortAlarms();
     save();
     emit alarmsChanged();
@@ -406,12 +422,19 @@ void AlarmManager::load() {
     }
     sortAlarms();
 
-    // After restart, re-arm due alarms so tick() will notify again
+    // After restart, re-arm due alarms so tick() will notify again.
+    // Mark them missed when the trigger time passed while the app was down.
     const QDateTime now = QDateTime::currentDateTimeUtc();
+    bool changed = false;
     for (auto& a : m_alarms) {
-        if (!a.acknowledged && a.isDue(now))
+        if (!a.acknowledged && a.isDue(now)) {
             a.triggered = false;
+            a.missed = true;
+            changed = true;
+        }
     }
+    if (changed)
+        save();
 }
 
 void AlarmManager::save() const {

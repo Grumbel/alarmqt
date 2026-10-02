@@ -3,7 +3,6 @@
 
 #include "Alarm.h"
 
-#include <QJsonObject>
 #include <QTimeZone>
 
 QJsonObject Alarm::toJson() const {
@@ -11,11 +10,14 @@ QJsonObject Alarm::toJson() const {
     o["id"] = id.toString(QUuid::WithoutBraces);
     o["command"] = command;
     o["label"] = label;
-    o["triggerUtc"] = triggerUtc.toString(Qt::ISODateWithMs);
+    o["triggerUtc"] = triggerUtc.toUTC().toString(Qt::ISODateWithMs);
+    o["scheduledUtc"] = scheduledUtc.toUTC().toString(Qt::ISODateWithMs);
     o["repeating"] = repeating;
     o["snoozeMinutes"] = snoozeMinutes;
     o["acknowledged"] = acknowledged;
     o["triggered"] = triggered;
+    o["snoozed"] = snoozed;
+    o["missed"] = missed;
     return o;
 }
 
@@ -24,17 +26,22 @@ Alarm Alarm::fromJson(const QJsonObject& obj) {
     a.id = QUuid::fromString(obj["id"].toString());
     a.command = obj["command"].toString();
     a.label = obj["label"].toString();
-    // Back-compat: old files only had "label" holding the expression or note
-    if (a.command.isEmpty() && !a.label.isEmpty() && !obj.contains(QStringLiteral("command"))) {
-        a.command = a.label;
-        a.label.clear();
-    }
     a.triggerUtc = QDateTime::fromString(obj["triggerUtc"].toString(), Qt::ISODateWithMs);
     a.triggerUtc.setTimeZone(QTimeZone::utc());
+    if (obj.contains(QStringLiteral("scheduledUtc"))) {
+        a.scheduledUtc = QDateTime::fromString(obj["scheduledUtc"].toString(), Qt::ISODateWithMs);
+        a.scheduledUtc.setTimeZone(QTimeZone::utc());
+    } else {
+        a.scheduledUtc = a.triggerUtc; // migrate older saves
+    }
+    if (!a.scheduledUtc.isValid())
+        a.scheduledUtc = a.triggerUtc;
     a.repeating = obj["repeating"].toBool(false);
     a.snoozeMinutes = obj["snoozeMinutes"].toInt(5);
     a.acknowledged = obj["acknowledged"].toBool(false);
     a.triggered = obj["triggered"].toBool(false);
+    a.snoozed = obj["snoozed"].toBool(false);
+    a.missed = obj["missed"].toBool(false);
     return a;
 }
 
