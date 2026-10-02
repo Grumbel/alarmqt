@@ -101,21 +101,41 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     if (trimmed.isEmpty())
         return std::nullopt;
 
+    // Optional user note:  in 5m (kitchen)  |  in 5m "kitchen"  |  in 5m 'kitchen'
+    QString timePart = trimmed;
+    QString note;
+    static const QRegularExpression noteRe(
+        R"(\A(.+?)\s*(?:\(([^)]+)\)|\"([^\"]+)\"|'([^']+)')\s*\z)");
+    if (auto nm = noteRe.match(trimmed); nm.hasMatch()) {
+        timePart = nm.captured(1).trimmed();
+        note = nm.captured(2);
+        if (note.isEmpty())
+            note = nm.captured(3);
+        if (note.isEmpty())
+            note = nm.captured(4);
+        note = note.trimmed();
+    }
+
     const QDateTime nowLocal = QDateTime::currentDateTime();
     QDateTime triggerLocal;
 
     // Prefer relative if it looks like one
-    if (trimmed.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
-        triggerLocal = parseRelative(trimmed, nowLocal);
+    if (timePart.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
+        triggerLocal = parseRelative(timePart, nowLocal);
     }
     if (!triggerLocal.isValid())
-        triggerLocal = parseAbsolute(trimmed, nowLocal);
+        triggerLocal = parseAbsolute(timePart, nowLocal);
     if (!triggerLocal.isValid())
         return std::nullopt;
 
     Alarm a;
     a.id = QUuid::createUuid();
-    a.label = label.isEmpty() ? trimmed : label;
+    if (!label.isEmpty())
+        a.label = label;
+    else if (!note.isEmpty())
+        a.label = note;
+    else
+        a.label = timePart;
     a.triggerUtc = triggerLocal.toUTC();
     a.acknowledged = false;
     a.triggered = false;

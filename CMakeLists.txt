@@ -10,7 +10,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Svg Multimedia)
 
 add_executable(alarmqt
   src/main.cpp
@@ -29,6 +29,7 @@ target_link_libraries(alarmqt PRIVATE
   Qt6::Widgets
   Qt6::Network
   Qt6::Svg
+  Qt6::Multimedia
 )
 
 include(GNUInstallDirs)

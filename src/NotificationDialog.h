@@ -7,15 +7,18 @@
 
 #include <QDialog>
 #include <QLabel>
-#include <QPushButton>
+#include <QFrame>
 #include <QTimer>
 #include <QKeyEvent>
 #include <QCloseEvent>
+
+class QSoundEffect;
 
 class NotificationDialog : public QDialog {
     Q_OBJECT
 public:
     explicit NotificationDialog(const Alarm& alarm, QWidget* parent = nullptr);
+    ~NotificationDialog() override;
 
     QUuid alarmId() const { return m_alarm.id; }
 
@@ -28,8 +31,15 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    void setBlinkOn(bool on);
+    void playSound();
+
     Alarm m_alarm;
-    QLabel* m_label = nullptr;
-    QTimer m_flashTimer;
-    bool m_flash = false;
+    QLabel* m_title = nullptr;
+    QLabel* m_subtitle = nullptr;
+    QFrame* m_leftBlink = nullptr;
+    QFrame* m_rightBlink = nullptr;
+    QTimer m_blinkTimer;
+    bool m_blinkOn = false;
+    QSoundEffect* m_sound = nullptr;
 };

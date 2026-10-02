@@ -28,6 +28,7 @@
           buildInputs = with pkgs; [
             qt6.qtbase
             qt6.qtsvg          # for SVG icon
+            qt6.qtmultimedia  # alarm sound
           ];
 
           cmakeFlags = [

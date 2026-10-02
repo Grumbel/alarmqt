@@ -49,7 +49,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
 
     auto* inputRow = new QHBoxLayout;
     m_input = new QLineEdit;
-    m_input->setPlaceholderText(tr("in 5m  ·  at 15:10  ·  at 2026-10-03 09:00"));
+    m_input->setPlaceholderText(tr("in 5m (kitchen)  ·  at 15:10 \"standup\""));
     m_input->setClearButtonEnabled(true);
     auto* addBtn = new QPushButton(tr("Add"));
     inputRow->addWidget(m_input, 1);
@@ -169,7 +169,9 @@ void MainWindow::addFromInput() {
                                 "  in 5m\n"
                                 "  in 2h30m\n"
                                 "  at 15:10\n"
-                                "  at 2026-10-03 09:00")
+                                "  at 2026-10-03 09:00\n"
+                                "  in 5m (kitchen)\n"
+                                "  in 10m \"tea\"")
                                  .arg(text));
         return;
     }
