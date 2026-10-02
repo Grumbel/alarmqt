@@ -16,6 +16,7 @@ private slots:
     void absolute_time_only();
     void absolute_full_date();
     void absolute_american_ampm();
+    void absolute_glued_timezone();
     void notes_trailing_words();
     void notes_comma();
     void notes_parens_and_quotes();
@@ -125,6 +126,38 @@ void TestParser::absolute_american_ampm() {
     QVERIFY(e.has_value());
     QCOMPARE(e->triggerUtc.toLocalTime().time().hour(), 18);
     QCOMPARE(e->triggerUtc.toLocalTime().time().minute(), 30);
+}
+
+
+void TestParser::absolute_glued_timezone() {
+    // Spaced word is a label, not a zone
+    auto labeled = AlarmManager::parse(QStringLiteral("at 15:10 CEST"));
+    QVERIFY(labeled.has_value());
+    QCOMPARE(labeled->label, QStringLiteral("CEST"));
+    QCOMPARE(labeled->command, QStringLiteral("at 15:10"));
+
+    auto cest = AlarmManager::parse(QStringLiteral("at 15:10CEST"));
+    QVERIFY(cest.has_value());
+    QVERIFY(cest->label.isEmpty());
+    QCOMPARE(cest->command, QStringLiteral("at 15:10CEST"));
+    // 15:10 CEST = 13:10 UTC
+    QCOMPARE(cest->triggerUtc.time().hour(), 13);
+    QCOMPARE(cest->triggerUtc.time().minute(), 10);
+
+    auto offset = AlarmManager::parse(QStringLiteral("at 15:10+02:00 ship"));
+    QVERIFY(offset.has_value());
+    QCOMPARE(offset->label, QStringLiteral("ship"));
+    QCOMPARE(offset->command, QStringLiteral("at 15:10+02:00"));
+    QCOMPARE(offset->triggerUtc.time().hour(), 13);
+
+    auto zulu = AlarmManager::parse(QStringLiteral("12:00Z"));
+    QVERIFY(zulu.has_value());
+    QCOMPARE(zulu->triggerUtc.time().hour(), 12);
+    QCOMPARE(zulu->triggerUtc.time().minute(), 0);
+
+    // am/pm still works (pm is not a zone token)
+    auto amp = AlarmManager::parse(QStringLiteral("6:00pm"));
+    QVERIFY(amp.has_value());
 }
 
 void TestParser::notes_trailing_words() {

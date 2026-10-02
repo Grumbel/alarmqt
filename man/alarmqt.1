@@ -55,6 +55,17 @@ Raise the existing main window.
 .BR 6:00pm ,
 .BR 6am
 (next occurrence if that clock time has already passed today)
+.PP
+Optional
+.B glued
+timezone on absolute times (no space before the zone; a space starts the note):
+.BR at\ 15:10CEST ,
+.BR at\ 12:00Z ,
+.BR at\ 15:10+02:00 ,
+.BR at\ 15:10CEST\ ship\ it .
+Spaced names are labels:
+.B at 15:10 CEST
+uses the system zone and the label CEST.
 .SS Notes
 Text after the time expression becomes the alarm label; the command column
 keeps only the time part:

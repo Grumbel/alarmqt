@@ -4,6 +4,7 @@
 #include "AlarmManager.h"
 
 #include <QDir>
+#include <QHash>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -77,13 +78,106 @@ static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     return nowLocal.addSecs(secs);
 }
 
+
+// Glued timezone on absolute times only: "15:10CEST", "15:10+02:00", "12:00Z".
+// A space before a word starts a label, not a zone ("15:10 standup").
+static const QString kGluedZoneSuffix = QStringLiteral(
+    R"((Z|UTC|GMT|[+-]\d{2}:\d{2}|[+-]\d{4})"
+    R"(|CET|CEST|EET|EEST|WET|WEST|BST|MSK)"
+    R"(|EST|EDT|CST|CDT|MST|MDT|PST|PDT)"
+    R"(|[A-Za-z]+/[A-Za-z0-9_+-]+))");
+
+static QTimeZone resolveZoneToken(const QString& raw) {
+    const QString t = raw.trimmed();
+    if (t.isEmpty())
+        return {};
+
+    if (t.compare(QLatin1String("Z"), Qt::CaseInsensitive) == 0
+        || t.compare(QLatin1String("UTC"), Qt::CaseInsensitive) == 0
+        || t.compare(QLatin1String("GMT"), Qt::CaseInsensitive) == 0)
+        return QTimeZone::utc();
+
+    static const QRegularExpression offRe(
+        QStringLiteral(R"(\A([+-])(\d{2}):?(\d{2})\z)"));
+    if (auto m = offRe.match(t); m.hasMatch()) {
+        const int sign = (m.captured(1) == QLatin1Char('-')) ? -1 : 1;
+        const int h = m.captured(2).toInt();
+        const int min = m.captured(3).toInt();
+        if (h <= 14 && min <= 59)
+            return QTimeZone(sign * (h * 3600 + min * 60));
+        return {};
+    }
+
+    if (t.contains(QLatin1Char('/'))) {
+        const QTimeZone z(t.toUtf8());
+        return z.isValid() ? z : QTimeZone();
+    }
+
+    // Fixed offsets for common abbreviations (CEST is always +02, not "Berlin in summer").
+    static const QHash<QString, int> kAbbrev = {
+        {QStringLiteral("CET"), 3600},
+        {QStringLiteral("CEST"), 7200},
+        {QStringLiteral("EET"), 7200},
+        {QStringLiteral("EEST"), 10800},
+        {QStringLiteral("WET"), 0},
+        {QStringLiteral("WEST"), 3600},
+        {QStringLiteral("BST"), 3600},
+        {QStringLiteral("MSK"), 10800},
+        {QStringLiteral("EST"), -5 * 3600},
+        {QStringLiteral("EDT"), -4 * 3600},
+        {QStringLiteral("CST"), -6 * 3600},
+        {QStringLiteral("CDT"), -5 * 3600},
+        {QStringLiteral("MST"), -7 * 3600},
+        {QStringLiteral("MDT"), -6 * 3600},
+        {QStringLiteral("PST"), -8 * 3600},
+        {QStringLiteral("PDT"), -7 * 3600},
+    };
+    const auto it = kAbbrev.constFind(t.toUpper());
+    if (it != kAbbrev.cend())
+        return QTimeZone(*it);
+    return {};
+}
+
+/** If text ends with a glued zone token, peel it into *zone and leave the time text. */
+static bool peelGluedZone(QString* text, QTimeZone* zone) {
+    static const QRegularExpression trailing(
+        QStringLiteral(R"(\A(.+?)") + kGluedZoneSuffix + QStringLiteral(R"()\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    const auto m = trailing.match(*text);
+    if (!m.hasMatch())
+        return false;
+    const QTimeZone z = resolveZoneToken(m.captured(2));
+    if (!z.isValid())
+        return false;
+    *text = m.captured(1);
+    *zone = z;
+    return true;
+}
+
 static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
     QString t = s.trimmed();
     // strip leading "at "
     if (t.startsWith(QLatin1String("at "), Qt::CaseInsensitive))
         t = t.mid(3).trimmed();
 
+    QTimeZone zone = nowLocal.timeZone();
+    bool hadGluedZone = peelGluedZone(&t, &zone);
+    if (hadGluedZone && !zone.isValid())
+        return {};
+
     QDateTime dt;
+    const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
+
+    auto finalizeTimeOnly = [&](const QTime& time) -> QDateTime {
+        if (!time.isValid())
+            return {};
+        // Calendar date in the target zone (today there), not necessarily local date.
+        const QDate zoneToday = QDateTime(nowUtc).toTimeZone(zone).date();
+        QDateTime candidate(zoneToday, time, zone);
+        if (candidate.toUTC() <= nowUtc)
+            candidate = candidate.addDays(1);
+        return candidate;
+    };
 
     // Full ISO-ish: 2026-10-02 15:10 or 2026-10-02T15:10:00
     dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-dd HH:mm:ss"));
@@ -93,24 +187,26 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
         dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-ddTHH:mm:ss"));
     if (!dt.isValid())
         dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-ddTHH:mm"));
+    if (dt.isValid()) {
+        // fromString yields local/no zone; pin the intended zone.
+        dt.setTimeZone(zone);
+        return dt;
+    }
 
-    // Time only (24h): 15:10 or 15:10:00 → today, or tomorrow if already passed
-    if (!dt.isValid()) {
+    // Time only (24h): 15:10 or 15:10:00
+    {
         QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
         if (!time.isValid())
             time = QTime::fromString(t, QStringLiteral("HH:mm"));
-        if (time.isValid()) {
-            dt = QDateTime(nowLocal.date(), time, nowLocal.timeZone());
-            if (dt <= nowLocal)
-                dt = dt.addDays(1);
-        }
+        dt = finalizeTimeOnly(time);
+        if (dt.isValid())
+            return dt;
     }
 
     // American 12-hour: 6:00am, 6:00 pm, 6am, 6 PM, 12:00am/pm
-    if (!dt.isValid()) {
+    {
         QString norm = t;
         norm.replace(QLatin1Char('.'), QString());
-        // After stripping dots, pattern is 6:00am / 6am / 6:00pm
         static const QRegularExpression amPmReFlat(
             R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap])m\z)",
             QRegularExpression::CaseInsensitiveOption);
@@ -124,23 +220,14 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
                     hour += 12;
                 else if (!pm && hour == 12)
                     hour = 0;
-                const QTime time(hour, minute, second);
-                if (time.isValid()) {
-                    dt = QDateTime(nowLocal.date(), time, nowLocal.timeZone());
-                    if (dt <= nowLocal)
-                        dt = dt.addDays(1);
-                }
+                dt = finalizeTimeOnly(QTime(hour, minute, second));
+                if (dt.isValid())
+                    return dt;
             }
         }
     }
 
-    if (!dt.isValid())
-        return {};
-
-    // Assume local timezone if none set
-    if (!dt.timeZone().isValid() || dt.timeZone() == QTimeZone::LocalTime)
-        dt.setTimeZone(nowLocal.timeZone());
-    return dt;
+    return {};
 }
 
 // Split "time expression" + optional human note.
@@ -194,9 +281,11 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
         }
     }
 
-    // 4) Absolute time prefix + trailing words: "at 15:10 meeting" / "15:10 tea"
+    // 4) Absolute time prefix (+ optional glued zone) + trailing words:
+    // "at 15:10 meeting" / "at 15:10CEST standup"
     static const QRegularExpression absPrefix(
-        R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)))",
+        QStringLiteral(R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)")
+        + kGluedZoneSuffix + QStringLiteral(R"(?)))"),
         QRegularExpression::CaseInsensitiveOption);
     if (auto am = absPrefix.match(trimmed); am.hasMatch()) {
         const QString prefix = am.captured(1).trimmed();
