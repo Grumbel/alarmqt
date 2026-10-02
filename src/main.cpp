@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
                       << "  (in " << opt->remainingString().toStdString() << ")\n";
         } else {
             std::cerr << "Could not parse alarm: " << expr.toStdString() << "\n"
-                      << "Examples: in 5m | in 5m (kitchen) | at 15:10\n";
+                      << "Examples: in 5m kitchen | in 5m, tea | at 15:10 standup\n";
             return 1;
         }
     }

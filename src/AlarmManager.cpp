@@ -96,25 +96,80 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
     return dt;
 }
 
+// Split "time expression" + optional human note.
+// Supported note forms (first match wins):
+//   in 5s, kitchen
+//   in 5s (kitchen)  /  in 5s "kitchen"  /  in 5s 'kitchen'
+//   in 5s kitchen          (trailing words after a relative duration)
+//   at 15:10 meeting       (trailing words after an absolute time)
+static void splitTimeAndNote(const QString& input, QString* timePart, QString* note) {
+    const QString trimmed = input.trimmed();
+    *timePart = trimmed;
+    *note = {};
+
+    // 1) Comma: "in 5s, kitchen"
+    if (const int comma = trimmed.indexOf(QLatin1Char(',')); comma > 0) {
+        *timePart = trimmed.left(comma).trimmed();
+        *note = trimmed.mid(comma + 1).trimmed();
+        return;
+    }
+
+    // 2) Parentheses / quotes at end
+    static const QRegularExpression noteRe(
+        R"(\A(.+?)\s*(?:\(([^)]+)\)|\"([^\"]+)\"|'([^']+)')\s*\z)");
+    if (auto nm = noteRe.match(trimmed); nm.hasMatch()) {
+        *timePart = nm.captured(1).trimmed();
+        *note = nm.captured(2);
+        if (note->isEmpty())
+            *note = nm.captured(3);
+        if (note->isEmpty())
+            *note = nm.captured(4);
+        *note = note->trimmed();
+        return;
+    }
+
+    // 3) Relative duration prefix + trailing words: "in 5s kitchen"
+    static const QRegularExpression relPrefix(
+        R"(\A((?:in\s+)?(?:\d+\s*d(?:ays?)?)?\s*(?:\d+\s*h(?:ours?)?)?\s*(?:\d+\s*m(?:in(?:utes?)?)?)?\s*(?:\d+\s*s(?:ec(?:onds?)?)?)?))",
+        QRegularExpression::CaseInsensitiveOption);
+    if (auto rm = relPrefix.match(trimmed); rm.hasMatch()) {
+        const QString prefix = rm.captured(1).trimmed();
+        // Must include at least one digit+unit (reject empty / "in" alone)
+        static const QRegularExpression hasUnit(
+            R"(\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption);
+        if (hasUnit.match(prefix).hasMatch()) {
+            const QString rest = trimmed.mid(rm.capturedLength(0)).trimmed();
+            if (!rest.isEmpty()) {
+                *timePart = prefix;
+                *note = rest;
+                return;
+            }
+        }
+    }
+
+    // 4) Absolute time prefix + trailing words: "at 15:10 meeting" / "15:10 tea"
+    static const QRegularExpression absPrefix(
+        R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)))",
+        QRegularExpression::CaseInsensitiveOption);
+    if (auto am = absPrefix.match(trimmed); am.hasMatch()) {
+        const QString prefix = am.captured(1).trimmed();
+        const QString rest = trimmed.mid(am.capturedLength(0)).trimmed();
+        if (!rest.isEmpty()) {
+            *timePart = prefix;
+            *note = rest;
+            return;
+        }
+    }
+}
+
 std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& label) {
     const QString trimmed = input.trimmed();
     if (trimmed.isEmpty())
         return std::nullopt;
 
-    // Optional user note:  in 5m (kitchen)  |  in 5m "kitchen"  |  in 5m 'kitchen'
-    QString timePart = trimmed;
+    QString timePart;
     QString note;
-    static const QRegularExpression noteRe(
-        R"(\A(.+?)\s*(?:\(([^)]+)\)|\"([^\"]+)\"|'([^']+)')\s*\z)");
-    if (auto nm = noteRe.match(trimmed); nm.hasMatch()) {
-        timePart = nm.captured(1).trimmed();
-        note = nm.captured(2);
-        if (note.isEmpty())
-            note = nm.captured(3);
-        if (note.isEmpty())
-            note = nm.captured(4);
-        note = note.trimmed();
-    }
+    splitTimeAndNote(trimmed, &timePart, &note);
 
     const QDateTime nowLocal = QDateTime::currentDateTime();
     QDateTime triggerLocal;
