@@ -1,9 +1,90 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <circle cx="32" cy="34" r="22" fill="#2d3748" stroke="#63b3ed" stroke-width="3"/>
-  <circle cx="32" cy="34" r="18" fill="#1a202c"/>
-  <line x1="32" y1="34" x2="32" y2="22" stroke="#63b3ed" stroke-width="3" stroke-linecap="round"/>
-  <line x1="32" y1="34" x2="42" y2="34" stroke="#90cdf4" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="32" cy="34" r="2.5" fill="#63b3ed"/>
-  <path d="M18 14 L12 8 M46 14 L52 8" stroke="#e53e3e" stroke-width="3" stroke-linecap="round"/>
-  <rect x="28" y="8" width="8" height="6" rx="1" fill="#63b3ed"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="faceGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff5f7"/>
+      <stop offset="100%" stop-color="#ffe4ec"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff9ec4"/>
+      <stop offset="100%" stop-color="#ff6b9d"/>
+    </linearGradient>
+    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd56b"/>
+      <stop offset="100%" stop-color="#ffb020"/>
+    </linearGradient>
+    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff8fab" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ff8fab" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft shadow -->
+  <ellipse cx="64" cy="118" rx="36" ry="6" fill="#000" opacity="0.12"/>
+
+  <!-- left bell -->
+  <g transform="translate(22,28) rotate(-28)">
+    <ellipse cx="0" cy="0" rx="16" ry="14" fill="url(#bellGrad)" stroke="#e8950a" stroke-width="2"/>
+    <ellipse cx="-4" cy="-4" rx="5" ry="3.5" fill="#ffe9a8" opacity="0.7"/>
+    <line x1="0" y1="14" x2="0" y2="22" stroke="#e8950a" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="0" cy="24" r="3.5" fill="#ffb020" stroke="#e8950a" stroke-width="1.5"/>
+  </g>
+
+  <!-- right bell -->
+  <g transform="translate(106,28) rotate(28)">
+    <ellipse cx="0" cy="0" rx="16" ry="14" fill="url(#bellGrad)" stroke="#e8950a" stroke-width="2"/>
+    <ellipse cx="-4" cy="-4" rx="5" ry="3.5" fill="#ffe9a8" opacity="0.7"/>
+    <line x1="0" y1="14" x2="0" y2="22" stroke="#e8950a" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="0" cy="24" r="3.5" fill="#ffb020" stroke="#e8950a" stroke-width="1.5"/>
+  </g>
+
+  <!-- clock body (round, pink) -->
+  <circle cx="64" cy="72" r="42" fill="url(#bodyGrad)" stroke="#e84a7f" stroke-width="3"/>
+  <!-- face disc -->
+  <circle cx="64" cy="72" r="32" fill="url(#faceGrad)" stroke="#ffb3c9" stroke-width="2"/>
+
+  <!-- tick marks -->
+  <g stroke="#ff8fab" stroke-width="2" stroke-linecap="round">
+    <line x1="64" y1="46" x2="64" y2="50"/>
+    <line x1="64" y1="94" x2="64" y2="98"/>
+    <line x1="40" y1="72" x2="44" y2="72"/>
+    <line x1="84" y1="72" x2="88" y2="72"/>
+  </g>
+
+  <!-- clock hands (cute, slight offset) -->
+  <line x1="64" y1="72" x2="64" y2="52" stroke="#e84a7f" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="64" y1="72" x2="82" y2="78" stroke="#ff6b9d" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="64" cy="72" r="3.5" fill="#e84a7f"/>
+
+  <!-- anime eyes (big sparkly) -->
+  <g>
+    <!-- left eye -->
+    <ellipse cx="52" cy="66" rx="7" ry="9" fill="#2d1b2e"/>
+    <circle cx="50" cy="63" r="2.8" fill="#fff"/>
+    <circle cx="54" cy="68" r="1.3" fill="#fff" opacity="0.9"/>
+    <!-- right eye -->
+    <ellipse cx="76" cy="66" rx="7" ry="9" fill="#2d1b2e"/>
+    <circle cx="74" cy="63" r="2.8" fill="#fff"/>
+    <circle cx="78" cy="68" r="1.3" fill="#fff" opacity="0.9"/>
+  </g>
+
+  <!-- happy smile -->
+  <path d="M56 82 Q64 90 72 82" fill="none" stroke="#e84a7f" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- blush cheeks -->
+  <circle cx="44" cy="78" r="6" fill="url(#cheek)"/>
+  <circle cx="84" cy="78" r="6" fill="url(#cheek)"/>
+
+  <!-- top button / crown -->
+  <rect x="58" y="26" width="12" height="8" rx="2" fill="#ff6b9d" stroke="#e84a7f" stroke-width="1.5"/>
+  <rect x="60" y="22" width="8" height="5" rx="1.5" fill="#ff9ec4" stroke="#e84a7f" stroke-width="1.2"/>
+
+  <!-- tiny sparkles -->
+  <g fill="#fff7ae">
+    <path d="M18 48 L20 52 L24 54 L20 56 L18 60 L16 56 L12 54 L16 52 Z" opacity="0.9"/>
+    <path d="M108 50 L109.5 53 L112.5 54.5 L109.5 56 L108 59 L106.5 56 L103.5 54.5 L106.5 53 Z" opacity="0.85"/>
+    <path d="M96 100 L97 102.5 L99.5 103.5 L97 104.5 L96 107 L95 104.5 L92.5 103.5 L95 102.5 Z" opacity="0.8"/>
+  </g>
 </svg>
