@@ -84,7 +84,6 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationName(QStringLiteral("alarmqt"));
     QApplication::setApplicationDisplayName(QStringLiteral("AlarmQt"));
     QApplication::setApplicationVersion(QStringLiteral(ALARMQT_VERSION));
-    // No organization name: AppDataLocation is ~/.local/share/alarmqt (not .../Org/alarmqt).
     QGuiApplication::setDesktopFileName(QStringLiteral("alarmqt"));
     app.setWindowIcon(QIcon(QStringLiteral(":/icons/alarm.svg")));
 

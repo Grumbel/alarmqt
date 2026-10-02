@@ -143,10 +143,13 @@ Examples:
 .RE
 .SH FILES
 .TP
-.I ~/.local/share/alarmqt/alarms.json
-Typical path for the JSON alarm store on Linux
-(Qt AppDataLocation for application
-.BR alarmqt ).
+.I $XDG_STATE_HOME/alarmqt/alarms.json
+Persistent alarm store (XDG state directory).
+Defaults to
+.I ~/.local/state/alarmqt/alarms.json
+when
+.B XDG_STATE_HOME
+is unset.
 .SH EXIT STATUS
 .TP
 .B 0

@@ -10,7 +10,6 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QTimeZone>
 #include <optional>
 
@@ -394,28 +393,17 @@ std::optional<Alarm> AlarmManager::nextAlarm() const {
 }
 
 QString AlarmManager::storagePath() const {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    // XDG Base Directory Spec: state goes under $XDG_STATE_HOME (default ~/.local/state).
+    QString stateHome = QString::fromLocal8Bit(qgetenv("XDG_STATE_HOME"));
+    if (stateHome.isEmpty())
+        stateHome = QDir::homePath() + QStringLiteral("/.local/state");
+    const QString dir = stateHome + QStringLiteral("/alarmqt");
     QDir().mkpath(dir);
     return dir + QStringLiteral("/alarms.json");
 }
 
-/** Pre-organization-less path: ~/.local/share/Grumbel/alarmqt/alarms.json */
-static QString legacyStoragePath() {
-    const QString home = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
-    return home + QStringLiteral("/.local/share/Grumbel/alarmqt/alarms.json");
-}
-
 void AlarmManager::load() {
-    QString path = storagePath();
-    bool fromLegacy = false;
-    if (!QFile::exists(path)) {
-        const QString legacy = legacyStoragePath();
-        if (QFile::exists(legacy)) {
-            path = legacy;
-            fromLegacy = true;
-        }
-    }
-    QFile f(path);
+    QFile f(storagePath());
     if (!f.open(QIODevice::ReadOnly))
         return;
     const auto doc = QJsonDocument::fromJson(f.readAll());
@@ -448,8 +436,8 @@ void AlarmManager::load() {
             changed = true;
         }
     }
-    if (changed || fromLegacy)
-        save(); // also migrates ~/.local/share/Grumbel/alarmqt/ → ~/.local/share/alarmqt/
+    if (changed)
+        save();
 }
 
 void AlarmManager::save() const {
