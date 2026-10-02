@@ -16,12 +16,12 @@
 namespace {
 constexpr int kBlinkIntervalMs = 250;
 constexpr int kSoundIntervalMs = 1500;
-constexpr int kSquareSize = 36;
+constexpr int kStripWidth = 48; // full-height side panels
 
 const char* kStyleRed =
-    "QFrame { background-color: #e53e3e; border: 1px solid #9b2c2c; }";
+    "QFrame { background-color: #e53e3e; border: none; }";
 const char* kStyleBlack =
-    "QFrame { background-color: #000000; border: 1px solid #1a1a1a; }";
+    "QFrame { background-color: #000000; border: none; }";
 } // namespace
 
 NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
@@ -35,34 +35,28 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     setMinimumWidth(440);
     setMinimumHeight(180);
 
-    // Default system grey background; only the side squares flash.
-    // No dark theme override.
+    // Default system grey background; only the full-height side strips flash.
 
+    // Side strips flush to the dialog edges, full height.
     auto* root = new QHBoxLayout(this);
-    root->setSpacing(8);
-    root->setContentsMargins(8, 8, 8, 8);
+    root->setSpacing(0);
+    root->setContentsMargins(0, 0, 0, 0);
 
-    auto makeSquareColumn = [](QFrame** outSquare) {
-        auto* column = new QWidget;
-        auto* colLay = new QVBoxLayout(column);
-        colLay->setContentsMargins(0, 0, 0, 0);
-        colLay->setSpacing(0);
-        colLay->addStretch(1);
-        auto* sq = new QFrame;
-        sq->setFixedSize(kSquareSize, kSquareSize);
-        sq->setStyleSheet(QString::fromUtf8(kStyleBlack));
-        colLay->addWidget(sq, 0, Qt::AlignHCenter);
-        colLay->addStretch(1);
-        *outSquare = sq;
-        return column;
+    auto makeStrip = [](QFrame** out) {
+        auto* strip = new QFrame;
+        strip->setFixedWidth(kStripWidth);
+        strip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        strip->setStyleSheet(QString::fromUtf8(kStyleBlack));
+        *out = strip;
+        return strip;
     };
 
-    auto* leftCol = makeSquareColumn(&m_leftBlink);
-    auto* rightCol = makeSquareColumn(&m_rightBlink);
+    auto* leftCol = makeStrip(&m_leftBlink);
+    auto* rightCol = makeStrip(&m_rightBlink);
 
     auto* center = new QWidget;
     auto* centerLayout = new QVBoxLayout(center);
-    centerLayout->setContentsMargins(12, 8, 12, 8);
+    centerLayout->setContentsMargins(16, 16, 16, 16);
 
     m_title = new QLabel(alarm.displayName());
     m_title->setAlignment(Qt::AlignCenter);
