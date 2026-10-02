@@ -124,12 +124,11 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setAlternatingRowColors(true);
     m_table->verticalHeader()->setVisible(false);
-    m_table->horizontalHeader()->setStretchLastSection(true);
-    m_table->horizontalHeader()->setSectionResizeMode(kColStatus, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(kColRemaining, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(kColWhen, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(kColCommand, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(kColLabel, QHeaderView::Stretch);
+    auto* header = m_table->horizontalHeader();
+    header->setStretchLastSection(true);
+    header->setSectionsMovable(true); // drag headers to reorder columns
+    header->setSectionResizeMode(QHeaderView::Interactive);
+    header->setSectionResizeMode(kColLabel, QHeaderView::Stretch);
     m_table->setShowGrid(false);
     m_table->setFocusPolicy(Qt::StrongFocus);
     m_table->setContextMenuPolicy(Qt::CustomContextMenu);
