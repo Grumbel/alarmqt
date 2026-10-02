@@ -103,6 +103,30 @@ void TestParser::absolute_full_date() {
     QCOMPARE(local.time().minute(), 30);
 }
 
+void TestParser::absolute_american_ampm() {
+    auto a = AlarmManager::parse(QStringLiteral("6:00am"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->triggerUtc.toLocalTime().time().hour(), 6);
+    QCOMPARE(a->triggerUtc.toLocalTime().time().minute(), 0);
+
+    auto b = AlarmManager::parse(QStringLiteral("6pm"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->triggerUtc.toLocalTime().time().hour(), 18);
+
+    auto c = AlarmManager::parse(QStringLiteral("12:00am"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().time().hour(), 0);
+
+    auto d = AlarmManager::parse(QStringLiteral("12:00pm"));
+    QVERIFY(d.has_value());
+    QCOMPARE(d->triggerUtc.toLocalTime().time().hour(), 12);
+
+    auto e = AlarmManager::parse(QStringLiteral("6:30 PM"));
+    QVERIFY(e.has_value());
+    QCOMPARE(e->triggerUtc.toLocalTime().time().hour(), 18);
+    QCOMPARE(e->triggerUtc.toLocalTime().time().minute(), 30);
+}
+
 void TestParser::notes_trailing_words() {
     auto a = AlarmManager::parse(QStringLiteral("in 5m kitchen"));
     QVERIFY(a.has_value());
