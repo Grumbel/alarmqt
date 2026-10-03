@@ -21,6 +21,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Single-instance** – starting the binary again focuses the existing window / sends CLI commands
 - **Keyboard-driven**
   - `Ctrl+N` / focus line edit → type alarm → Enter
+  - `F1` / **Help** button — full alarm time syntax with examples
   - `Delete` / `Ctrl+D` remove selected
   - `Ctrl+E` edit · `Ctrl+R` restart · `Ctrl+K` skip next (repeating)
   - `Space` / Enter on triggered dialog = Acknowledge

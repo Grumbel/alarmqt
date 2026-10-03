@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** HEAD after full-height notify strips (see latest bundle)
-- **Next bundle NNN:** 029
+- **Current tip:** Help button / F1 syntax dialog (this session)
+- **Next bundle NNN:** 030
 
 ## Status
 
@@ -20,6 +20,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Help button + F1: full alarm time syntax dialog (relative, absolute,
+  glued zones, repeating, notes) with examples; parse-error hint points here
 - Recurring alarms: `every 5m`, `every monday at 18:00`, `daily at 7:30`,
   weekdays/weekends; re-arm on ack, Skip next (Ctrl+K), DST-safe
 - Fix glued timezone parsing (`at 15:10CEST`)
@@ -33,4 +35,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-022.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-029.*.bundle` from artifacts (cumulative from `071e920`).

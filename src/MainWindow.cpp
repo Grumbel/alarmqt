@@ -29,6 +29,7 @@
 #include <QFontMetrics>
 #include <QSizePolicy>
 #include <QStatusBar>
+#include <QTextBrowser>
 
 #include <algorithm>
 
@@ -109,11 +110,14 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     auto* editBtn = new QPushButton(tr("Edit"));
     auto* restartBtn = new QPushButton(tr("Restart"));
     auto* removeBtn = new QPushButton(tr("Remove"));
+    auto* helpBtn = new QPushButton(tr("Help"));
+    helpBtn->setToolTip(tr("Alarm time syntax (F1)"));
     inputRow->addWidget(m_input, 1);
     inputRow->addWidget(addBtn);
     inputRow->addWidget(editBtn);
     inputRow->addWidget(restartBtn);
     inputRow->addWidget(removeBtn);
+    inputRow->addWidget(helpBtn);
     layout->addLayout(inputRow);
 
     connect(m_input, &QLineEdit::returnPressed, this, &MainWindow::addFromInput);
@@ -121,6 +125,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     connect(editBtn, &QPushButton::clicked, this, &MainWindow::editSelected);
     connect(restartBtn, &QPushButton::clicked, this, &MainWindow::restartSelected);
     connect(removeBtn, &QPushButton::clicked, this, &MainWindow::removeSelected);
+    connect(helpBtn, &QPushButton::clicked, this, &MainWindow::showSyntaxHelp);
 
     m_table = new QTableWidget(0, 5);
     m_table->setHorizontalHeaderLabels(
@@ -159,6 +164,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), this, [this]() { editSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_R), this, [this]() { restartSelected(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_K), this, [this]() { skipSelected(); });
+    new QShortcut(QKeySequence::HelpContents, this, [this]() { showSyntaxHelp(); });
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
 
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
@@ -313,12 +319,118 @@ void MainWindow::addFromInput() {
                                 "  at 2026-10-03 09:00\n"
                                 "  every 30m drink water\n"
                                 "  every monday at 18:00 laundry\n"
-                                "  every weekday at 9:00 standup")
+                                "  every weekday at 9:00 standup\n\n"
+                                "Press Help or F1 for the full syntax.")
                                  .arg(text));
         return;
     }
     m_manager->add(*opt);
     m_input->clear();
+}
+
+void MainWindow::showSyntaxHelp() {
+    auto* dlg = new QDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowTitle(tr("Alarm time syntax"));
+    dlg->resize(560, 520);
+
+    auto* layout = new QVBoxLayout(dlg);
+    auto* browser = new QTextBrowser(dlg);
+    browser->setOpenExternalLinks(false);
+    browser->setHtml(tr(
+        "<h2>Alarm time syntax</h2>"
+        "<p>Type a time expression in the input line, optionally followed by a "
+        "note. The time part becomes the <b>Command</b>; trailing text becomes "
+        "the <b>Label</b>.</p>"
+
+        "<h3>Relative</h3>"
+        "<p>Count from now. The word <code>in</code> is optional.</p>"
+        "<ul>"
+        "<li><code>in 5m</code> &nbsp; <code>5m</code> &nbsp; <code>30s</code></li>"
+        "<li><code>in 2h30m</code> &nbsp; <code>in 1d</code></li>"
+        "<li><code>in 10 mins</code> &nbsp; <code>in 2 hours</code> &nbsp; "
+        "<code>in 1 hour 15 minutes</code></li>"
+        "</ul>"
+        "<p>Units: <code>s</code>/<code>sec</code>/<code>secs</code>/<code>second</code>/<code>seconds</code>, "
+        "<code>m</code>/<code>min</code>/<code>mins</code>/<code>minute</code>/<code>minutes</code>, "
+        "<code>h</code>/<code>hr</code>/<code>hrs</code>/<code>hour</code>/<code>hours</code>, "
+        "<code>d</code>/<code>day</code>/<code>days</code>.</p>"
+
+        "<h3>Absolute</h3>"
+        "<p>A clock time today (or tomorrow if that time has already passed), "
+        "or a full date-time. The word <code>at</code> is optional.</p>"
+        "<ul>"
+        "<li><code>at 15:10</code> &nbsp; <code>15:10</code></li>"
+        "<li><code>6:00pm</code> &nbsp; <code>6am</code> &nbsp; <code>6:00 p.m.</code></li>"
+        "<li><code>at 2026-10-03 09:00</code></li>"
+        "</ul>"
+
+        "<h3>Timezone on absolute times</h3>"
+        "<p>A zone may be <b>glued</b> to the time (no space). A space starts the label.</p>"
+        "<ul>"
+        "<li><code>at 15:10CEST</code> &nbsp; <code>at 12:00Z</code> &nbsp; "
+        "<code>at 15:10+02:00</code></li>"
+        "<li><code>at 15:10CEST ship it</code> — zone CEST, label “ship it”</li>"
+        "<li><code>at 15:10 CEST</code> — system zone, label “CEST”</li>"
+        "</ul>"
+
+        "<h3>Repeating</h3>"
+        "<p><code>each</code> is accepted in place of <code>every</code>.</p>"
+        "<p><b>Interval</b> — fires again after the interval, counted from "
+        "acknowledgement (an ignored alarm stays due):</p>"
+        "<ul>"
+        "<li><code>every 5m</code> &nbsp; <code>every 1h30m</code> &nbsp; "
+        "<code>every hour</code></li>"
+        "</ul>"
+        "<p><b>Weekly</b> — local wall-clock time; stays fixed across DST. "
+        "Days may be full or short names, plural, joined with commas, "
+        "<code>and</code>, <code>&amp;</code>, or <code>/</code>:</p>"
+        "<ul>"
+        "<li><code>every monday at 18:00</code></li>"
+        "<li><code>every mon, thu 6pm</code></li>"
+        "<li><code>every mon and fri at 9:00</code></li>"
+        "</ul>"
+        "<p><b>Daily / weekdays / weekends</b>:</p>"
+        "<ul>"
+        "<li><code>daily at 7:30</code> &nbsp; <code>every day at 7:30</code></li>"
+        "<li><code>every weekday at 9:00</code></li>"
+        "<li><code>weekends 10am</code> &nbsp; <code>every weekend at 10:00</code></li>"
+        "</ul>"
+        "<p>Acknowledging a repeating alarm schedules the next occurrence "
+        "instead of marking it DONE. <b>Skip next</b> (context menu, Ctrl+K) "
+        "drops the upcoming occurrence. Remove the alarm to stop it.</p>"
+
+        "<h3>Notes (labels)</h3>"
+        "<p>Text after the time expression becomes the label:</p>"
+        "<ul>"
+        "<li><code>in 10m stretch</code></li>"
+        "<li><code>in 5m, water plants</code></li>"
+        "<li><code>at 15:10 team call</code></li>"
+        "<li><code>in 5m (laundry)</code> &nbsp; <code>in 10m \"pick up kids\"</code></li>"
+        "</ul>"
+
+        "<h3>Examples</h3>"
+        "<ul>"
+        "<li><code>in 5m</code></li>"
+        "<li><code>in 10m stretch</code></li>"
+        "<li><code>in 5m, water plants</code></li>"
+        "<li><code>at 15:10 team call</code></li>"
+        "<li><code>at 15:10CEST ship it</code></li>"
+        "<li><code>in 2h30m</code></li>"
+        "<li><code>at 2026-10-03 09:00</code></li>"
+        "<li><code>every 30m drink water</code></li>"
+        "<li><code>every monday at 18:00 laundry</code></li>"
+        "<li><code>every weekday at 9:00 standup</code></li>"
+        "<li><code>daily at 7:30</code></li>"
+        "</ul>"
+    ));
+    layout->addWidget(browser);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dlg);
+    connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+    layout->addWidget(buttons);
+
+    dlg->exec();
 }
 
 void MainWindow::removeSelected() {

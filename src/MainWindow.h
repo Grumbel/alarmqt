@@ -46,6 +46,7 @@ private slots:
     void onTableContextMenu(const QPoint& pos);
     void updateTray();
     void renotifyTriggered();
+    void showSyntaxHelp();
 
 private:
     void createTray();
