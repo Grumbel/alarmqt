@@ -21,7 +21,7 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 - **Single-instance** – starting the binary again focuses the existing window / sends CLI commands
 - **Keyboard-driven**
   - `Ctrl+N` / focus line edit → type alarm → Enter
-  - `F1` / **Help** button — full alarm time syntax with examples
+  - `F1` / **?** — full alarm time syntax with examples
   - `Delete` / `Ctrl+D` remove selected
   - `Ctrl+E` edit · `Ctrl+R` restart · `Ctrl+K` skip next (repeating)
   - `Space` / Enter on triggered dialog = Acknowledge
@@ -34,8 +34,8 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
   wall-clock time across DST, and missed occurrences fire once, not once per
   missed slot. **Skip next** drops the upcoming occurrence.
 - **Command** (expression) and **Label** (note) are separate columns
-- **Edit** via button, Ctrl+E, or double-click
-- **Restart** re-arms from the original command (button, Ctrl+R, or right-click)
+- **Edit** via double-click, Ctrl+E, or right-click
+- **Restart** re-arms from the original command (Ctrl+R or right-click)
 - **Clear DONE** from context menu or tray (removes finished alarms in bulk)
 - Classic **QWidget** UI (no QML)
 

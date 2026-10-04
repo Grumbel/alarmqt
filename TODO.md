@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Help button / F1 syntax dialog (this session)
-- **Next bundle NNN:** 030
+- **Current tip:** minimal input row (Enter / context menu / ? for Help)
+- **Next bundle NNN:** 031
 
 ## Status
 
@@ -20,6 +20,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Minimal input row: drop Add/Edit/Restart/Remove toolbar buttons; keep
+  compact **?** for syntax help (F1). Actions via Enter, shortcuts, double-click,
+  context menu
 - Help button + F1: full alarm time syntax dialog (relative, absolute,
   glued zones, repeating, notes) with examples; parse-error hint points here
 - Recurring alarms: `every 5m`, `every monday at 18:00`, `daily at 7:30`,
@@ -35,4 +38,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-029.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-030.*.bundle` from artifacts (cumulative from `071e920`).

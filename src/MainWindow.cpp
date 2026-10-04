@@ -106,25 +106,15 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     m_input->setPlaceholderText(
         tr("in 10m stretch  ·  at 15:10 team call  ·  every monday at 18:00 laundry"));
     m_input->setClearButtonEnabled(true);
-    auto* addBtn = new QPushButton(tr("Add"));
-    auto* editBtn = new QPushButton(tr("Edit"));
-    auto* restartBtn = new QPushButton(tr("Restart"));
-    auto* removeBtn = new QPushButton(tr("Remove"));
-    auto* helpBtn = new QPushButton(tr("Help"));
+    auto* helpBtn = new QPushButton(tr("?"));
     helpBtn->setToolTip(tr("Alarm time syntax (F1)"));
+    helpBtn->setFixedWidth(helpBtn->sizeHint().height() + 8);
+    helpBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     inputRow->addWidget(m_input, 1);
-    inputRow->addWidget(addBtn);
-    inputRow->addWidget(editBtn);
-    inputRow->addWidget(restartBtn);
-    inputRow->addWidget(removeBtn);
     inputRow->addWidget(helpBtn);
     layout->addLayout(inputRow);
 
     connect(m_input, &QLineEdit::returnPressed, this, &MainWindow::addFromInput);
-    connect(addBtn, &QPushButton::clicked, this, &MainWindow::addFromInput);
-    connect(editBtn, &QPushButton::clicked, this, &MainWindow::editSelected);
-    connect(restartBtn, &QPushButton::clicked, this, &MainWindow::restartSelected);
-    connect(removeBtn, &QPushButton::clicked, this, &MainWindow::removeSelected);
     connect(helpBtn, &QPushButton::clicked, this, &MainWindow::showSyntaxHelp);
 
     m_table = new QTableWidget(0, 5);
