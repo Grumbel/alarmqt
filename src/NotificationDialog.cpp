@@ -93,7 +93,7 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     const QDateTime whenLocal = (alarm.scheduledUtc.isValid() ? alarm.scheduledUtc : alarm.triggerUtc)
                                     .toLocalTime();
     QString whenText = tr("When: %1").arg(
-        whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+        whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
     if (alarm.recurrence.isRecurring())
         whenText += tr("  ·  repeats %1").arg(alarm.recurrence.describe());
     m_when = new QLabel(whenText);

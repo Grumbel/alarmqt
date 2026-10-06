@@ -57,6 +57,56 @@ QColor rowBackground(const Alarm& a) {
 
 } // namespace
 
+// Big clock text that shrinks its font to fit the width it is given.
+// Horizontally it takes whatever space the layout offers (it never forces
+// the window wider); its height stays that of the largest font so the rest
+// of the window does not jump while resizing.
+class ClockLabel : public QLabel {
+public:
+    ClockLabel(int maxPointSize, int minPointSize, QWidget* parent = nullptr)
+        : QLabel(parent)
+        , m_maxPointSize(maxPointSize)
+        , m_minPointSize(minPointSize)
+    {
+        setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+        setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        setContentsMargins(0, 4, 0, 4);
+        QFont f = font();
+        f.setBold(true);
+        f.setPointSize(m_maxPointSize);
+        setFont(f);
+        setFixedHeight(QFontMetrics(f).height() + 8);
+    }
+
+    void setClockText(const QString& text) {
+        setText(text);
+        fitFont();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent* event) override {
+        QLabel::resizeEvent(event);
+        fitFont();
+    }
+
+private:
+    void fitFont() {
+        const int available = contentsRect().width();
+        if (available <= 0 || text().isEmpty())
+            return;
+        QFont f = font();
+        int size = m_maxPointSize;
+        f.setPointSize(size);
+        while (size > m_minPointSize && QFontMetrics(f).horizontalAdvance(text()) > available)
+            f.setPointSize(--size);
+        if (font().pointSize() != size)
+            setFont(f);
+    }
+
+    int m_maxPointSize;
+    int m_minPointSize;
+};
+
 MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     : QMainWindow(parent)
     , m_manager(manager)
@@ -84,17 +134,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
         m_clockIcon->setPixmap(icon.pixmap(QSize(72, 72)));
     }
 
-    m_clock = new QLabel;
-    m_clock->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    m_clock->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_clock->setMinimumWidth(0);
-    QFont clockFont = font();
-    m_clockMaxPointSize = clockFont.pointSize() + 14;
-    m_clockMinPointSize = std::max(9, font().pointSize());
-    clockFont.setPointSize(m_clockMaxPointSize);
-    clockFont.setBold(true);
-    m_clock->setFont(clockFont);
-    m_clock->setStyleSheet(QStringLiteral("padding: 4px 0;"));
+    m_clock = new ClockLabel(font().pointSize() + 14, std::max(9, font().pointSize()));
 
     clockRow->addWidget(m_clockIcon, 0, Qt::AlignVCenter);
     clockRow->addWidget(m_clock, 1, Qt::AlignVCenter);
@@ -199,40 +239,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::updateClock() {
     const QDateTime now = QDateTime::currentDateTime();
-    m_clock->setText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss  t")));
-    fitClockFont();
-}
-
-void MainWindow::fitClockFont() {
-    if (!m_clock)
-        return;
-    // Available width inside the label (account for stylesheet padding).
-    const int available = m_clock->contentsRect().width();
-    if (available <= 0)
-        return;
-
-    const QString text = m_clock->text();
-    if (text.isEmpty())
-        return;
-
-    QFont f = m_clock->font();
-    f.setBold(true);
-    int size = m_clockMaxPointSize;
-    f.setPointSize(size);
-    while (size > m_clockMinPointSize) {
-        const QFontMetrics fm(f);
-        if (fm.horizontalAdvance(text) <= available)
-            break;
-        --size;
-        f.setPointSize(size);
-    }
-    if (m_clock->font().pointSize() != size)
-        m_clock->setFont(f);
-}
-
-void MainWindow::resizeEvent(QResizeEvent* event) {
-    QMainWindow::resizeEvent(event);
-    fitClockFont();
+    m_clock->setClockText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss")));
 }
 
 void MainWindow::createTray() {
@@ -721,7 +728,7 @@ void MainWindow::refreshList() {
 
         // "When" is the real scheduled time; snooze only moves triggerUtc.
         const QDateTime whenSrc = a.scheduledUtc.isValid() ? a.scheduledUtc : a.triggerUtc;
-        setCell(row, kColWhen, whenSrc.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")));
+        setCell(row, kColWhen, whenSrc.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
         auto* command = setCell(row, kColCommand, a.command);
         const QString repeatTip = recurring ? tr("Repeats: %1").arg(a.recurrence.describe())
                                             : QString();

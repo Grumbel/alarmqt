@@ -33,7 +33,7 @@ static void printAlarmList(const AlarmManager& manager, bool includeDone) {
             remaining = a.remainingString();
         std::cout << a.statusText().toStdString() << "  "
                   << remaining.toStdString() << "  "
-                  << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")).toStdString()
+                  << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")).toStdString()
                   << "  [" << a.command.toStdString() << "]"
                   << (a.label.isEmpty() ? "" : (" " + a.label.toStdString()))
                   << "\n";
@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
             manager.add(*opt);
             const auto local = opt->triggerUtc.toLocalTime();
             std::cout << "Alarm added: " << opt->displayName().toStdString()
-                      << "  at " << local.toString(Qt::ISODate).toStdString()
+                      << "  at " << local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")).toStdString()
                       << "  (in " << opt->remainingString().toStdString() << ")\n";
         } else {
             std::cerr << "Could not parse alarm: " << expr.toStdString() << "\n"

@@ -34,7 +34,7 @@ QString AlarmDBus::formatLine(const Alarm& a) {
 
     QString line = QStringLiteral("%1  %2  %3  [%4]")
                        .arg(st, remaining,
-                            local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss t")),
+                            local.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")),
                             a.command);
     if (!a.label.isEmpty())
         line += QLatin1Char(' ') + a.label;

@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** animated ringing clock in the notification dialog
+- **Current tip:** clock text fits on resize; no time zone in displayed times
 - **Next bundle NNN:** 031
 
 ## Status
@@ -20,6 +20,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Big clock shrinks to fit instead of cropping on resize; displayed times
+  (clock, table, notification, `--list`, CLI add) drop the zone suffix —
+  always local
 - Notification dialog: animated ringing clock (`icons/alarm-ringing.svg`,
   SMIL, played via QSvgRenderer) — hops side to side, rattles its bells,
   radiates sound waves

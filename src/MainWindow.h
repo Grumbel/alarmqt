@@ -7,6 +7,7 @@
 #include "NotificationDialog.h"
 
 #include <QMainWindow>
+
 #include <QSystemTrayIcon>
 #include <QTableWidget>
 #include <QLineEdit>
@@ -15,6 +16,7 @@
 #include <QTimer>
 #include <QSet>
 
+class ClockLabel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -28,12 +30,10 @@ public slots:
 protected:
     void closeEvent(QCloseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
-    void resizeEvent(QResizeEvent* event) override;
 
 private slots:
     void refreshList();
     void updateClock();
-    void fitClockFont();
     void onAlarmTriggered(const Alarm& a);
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
     void addFromInput();
@@ -55,9 +55,7 @@ private:
 
     AlarmManager* m_manager;
     QLabel* m_clockIcon = nullptr;
-    QLabel* m_clock = nullptr;
-    int m_clockMaxPointSize = 12;
-    int m_clockMinPointSize = 9;
+    ClockLabel* m_clock = nullptr;
     QTableWidget* m_table = nullptr;
     QLineEdit* m_input = nullptr;
     QLabel* m_status = nullptr;
