@@ -8,8 +8,10 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QPushButton>
+#include <QPainter>
 #include <QScreen>
 #include <QSoundEffect>
+#include <QSvgRenderer>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -22,6 +24,28 @@ const char* kStyleRed =
     "QFrame { background-color: #e53e3e; border: none; }";
 const char* kStyleBlack =
     "QFrame { background-color: #000000; border: none; }";
+
+// Plays the animated (SMIL) ringing clock; QSvgRenderer drives the frames.
+class RingingClock : public QWidget {
+public:
+    explicit RingingClock(QWidget* parent = nullptr)
+        : QWidget(parent)
+        , m_renderer(QStringLiteral(":/icons/alarm-ringing.svg"), this)
+    {
+        setFixedSize(m_renderer.defaultSize() * 3 / 4);
+        connect(&m_renderer, &QSvgRenderer::repaintNeeded, this, qOverload<>(&QWidget::update));
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        m_renderer.render(&p, rect());
+    }
+
+private:
+    QSvgRenderer m_renderer;
+};
 } // namespace
 
 NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
@@ -85,6 +109,7 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     m_subtitle->setWordWrap(true);
 
     centerLayout->addStretch(1);
+    centerLayout->addWidget(new RingingClock, 0, Qt::AlignHCenter);
     centerLayout->addWidget(m_title);
     centerLayout->addWidget(m_when);
     centerLayout->addWidget(m_subtitle);

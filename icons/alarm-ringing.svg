@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Animated variant of alarm.svg: the clock hops side to side, leans into
+     each hop, squashes on landing and rattles its bells. One full cycle
+     (two hops) is 1s. Uses SMIL animateTransform / animate so it plays in
+     QSvgRenderer as well as in browsers. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="176" height="156" viewBox="-24 -28 176 156">
+  <defs>
+    <linearGradient id="faceGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff5f7"/>
+      <stop offset="100%" stop-color="#ffe4ec"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff9ec4"/>
+      <stop offset="100%" stop-color="#ff6b9d"/>
+    </linearGradient>
+    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd56b"/>
+      <stop offset="100%" stop-color="#ffb020"/>
+    </linearGradient>
+    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff8fab" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ff8fab" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft shadow: follows the clock sideways, shrinks while airborne -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="1s" repeatCount="indefinite"
+      values="54,118;56.5,118;59,118;61.5,118;64,118;66.5,118;69,118;71.5,118;74,118;71.5,118;69,118;66.5,118;64,118;61.5,118;59,118;56.5,118;54,118"/>
+    <g>
+      <animateTransform attributeName="transform" type="scale" dur="1s" repeatCount="indefinite"
+        values="1 1;0.85 0.85;0.74 0.74;0.67 0.67;0.65 0.65;0.67 0.67;0.74 0.74;0.85 0.85;1 1;0.85 0.85;0.74 0.74;0.67 0.67;0.65 0.65;0.67 0.67;0.74 0.74;0.85 0.85;1 1"/>
+      <ellipse cx="0" cy="0" rx="36" ry="6" fill="#000" opacity="0.12"/>
+    </g>
+  </g>
+
+  <!-- hop: sideways travel + parabolic jump -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="1s" repeatCount="indefinite"
+      values="-10,0;-7.5,-7.9;-5,-13.5;-2.5,-16.9;0,-18;2.5,-16.9;5,-13.5;7.5,-7.9;10,0;7.5,-7.9;5,-13.5;2.5,-16.9;0,-18;-2.5,-16.9;-5,-13.5;-7.5,-7.9;-10,0"/>
+    <!-- lean into the direction of travel, pivoting on the bottom -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" dur="1s" repeatCount="indefinite"
+        values="0 64 114;3.4 64 114;6.4 64 114;8.3 64 114;9 64 114;8.3 64 114;6.4 64 114;3.4 64 114;0 64 114;-3.4 64 114;-6.4 64 114;-8.3 64 114;-9 64 114;-8.3 64 114;-6.4 64 114;-3.4 64 114;0 64 114"/>
+      <!-- squash on landing, stretch on take-off (scaled around the bottom) -->
+      <g transform="translate(64,114)">
+        <g>
+          <animateTransform attributeName="transform" type="scale" dur="1s" repeatCount="indefinite"
+            values="1.1 0.86;0.96 1.05;1 1;1 1;1 1;1 1;1 1;0.96 1.05;1.1 0.86;0.96 1.05;1 1;1 1;1 1;1 1;1 1;0.96 1.05;1.1 0.86"/>
+          <g transform="translate(-64,-114)">
+
+            <!-- sound waves radiating out from the bells -->
+            <g fill="none" stroke="#ffb020" stroke-width="2.2" stroke-linecap="round">
+              <g transform="translate(22,28)">
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="0s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="0s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="-0.133s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="-0.133s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="-0.267s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="-0.267s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+              </g>
+              <g transform="translate(106,28) scale(-1,1)">
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="0s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="0s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="-0.133s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="-0.133s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+                <g>
+                  <animateTransform attributeName="transform" type="scale" dur="0.4s" begin="-0.267s" repeatCount="indefinite" values="0.8 0.8;1.55 1.55"/>
+                  <path d="M-21.25 -5.69 A22 22 0 0 1 -5.69 -21.25">
+                    <animate attributeName="opacity" dur="0.4s" begin="-0.267s" repeatCount="indefinite" values="0;1;0.5;0"/>
+                  </path>
+                </g>
+              </g>
+            </g>
+
+            <!-- left bell -->
+            <g transform="translate(22,28) rotate(-28)">
+              <g>
+                <animateTransform attributeName="transform" type="rotate" dur="0.12s" repeatCount="indefinite"
+                  values="-14 0 4;14 0 4;-14 0 4"/>
+                <ellipse cx="0" cy="0" rx="16" ry="14" fill="url(#bellGrad)" stroke="#e8950a" stroke-width="2"/>
+                <ellipse cx="-4" cy="-4" rx="5" ry="3.5" fill="#ffe9a8" opacity="0.7"/>
+                <line x1="0" y1="14" x2="0" y2="22" stroke="#e8950a" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="0" cy="24" r="3.5" fill="#ffb020" stroke="#e8950a" stroke-width="1.5"/>
+              </g>
+            </g>
+
+            <!-- right bell (shakes in counter-phase) -->
+            <g transform="translate(106,28) rotate(28)">
+              <g>
+                <animateTransform attributeName="transform" type="rotate" dur="0.12s" repeatCount="indefinite"
+                  values="14 0 4;-14 0 4;14 0 4"/>
+                <ellipse cx="0" cy="0" rx="16" ry="14" fill="url(#bellGrad)" stroke="#e8950a" stroke-width="2"/>
+                <ellipse cx="-4" cy="-4" rx="5" ry="3.5" fill="#ffe9a8" opacity="0.7"/>
+                <line x1="0" y1="14" x2="0" y2="22" stroke="#e8950a" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="0" cy="24" r="3.5" fill="#ffb020" stroke="#e8950a" stroke-width="1.5"/>
+              </g>
+            </g>
+
+            <!-- clock body (round, pink) -->
+            <circle cx="64" cy="72" r="42" fill="url(#bodyGrad)" stroke="#e84a7f" stroke-width="3"/>
+            <!-- face disc -->
+            <circle cx="64" cy="72" r="32" fill="url(#faceGrad)" stroke="#ffb3c9" stroke-width="2"/>
+
+            <!-- tick marks -->
+            <g stroke="#ff8fab" stroke-width="2" stroke-linecap="round">
+              <line x1="64" y1="46" x2="64" y2="50"/>
+              <line x1="64" y1="94" x2="64" y2="98"/>
+              <line x1="40" y1="72" x2="44" y2="72"/>
+              <line x1="84" y1="72" x2="88" y2="72"/>
+            </g>
+
+            <!-- clock hands -->
+            <line x1="64" y1="72" x2="64" y2="52" stroke="#e84a7f" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="64" y1="72" x2="82" y2="78" stroke="#ff6b9d" stroke-width="2.8" stroke-linecap="round"/>
+            <circle cx="64" cy="72" r="3.5" fill="#e84a7f"/>
+
+            <!-- anime eyes (big sparkly) -->
+            <g>
+              <ellipse cx="52" cy="66" rx="7" ry="9" fill="#2d1b2e"/>
+              <circle cx="50" cy="63" r="2.8" fill="#fff"/>
+              <circle cx="54" cy="68" r="1.3" fill="#fff" opacity="0.9"/>
+              <ellipse cx="76" cy="66" rx="7" ry="9" fill="#2d1b2e"/>
+              <circle cx="74" cy="63" r="2.8" fill="#fff"/>
+              <circle cx="78" cy="68" r="1.3" fill="#fff" opacity="0.9"/>
+            </g>
+
+            <!-- open, excited mouth -->
+            <path d="M56 81 Q64 92 72 81 Q64 84 56 81 Z" fill="#e84a7f" stroke="#e84a7f" stroke-width="2" stroke-linejoin="round"/>
+
+            <!-- blush cheeks -->
+            <circle cx="44" cy="78" r="6" fill="url(#cheek)"/>
+            <circle cx="84" cy="78" r="6" fill="url(#cheek)"/>
+
+            <!-- top button / crown -->
+            <rect x="58" y="26" width="12" height="8" rx="2" fill="#ff6b9d" stroke="#e84a7f" stroke-width="1.5"/>
+            <rect x="60" y="22" width="8" height="5" rx="1.5" fill="#ff9ec4" stroke="#e84a7f" stroke-width="1.2"/>
+
+            <!-- tiny sparkles, twinkling -->
+            <g fill="#fff7ae">
+              <path d="M18 48 L20 52 L24 54 L20 56 L18 60 L16 56 L12 54 L16 52 Z">
+                <animate attributeName="opacity" dur="0.6s" repeatCount="indefinite" values="0.9;0.2;0.9"/>
+              </path>
+              <path d="M108 50 L109.5 53 L112.5 54.5 L109.5 56 L108 59 L106.5 56 L103.5 54.5 L106.5 53 Z">
+                <animate attributeName="opacity" dur="0.6s" repeatCount="indefinite" values="0.2;0.85;0.2"/>
+              </path>
+              <path d="M96 100 L97 102.5 L99.5 103.5 L97 104.5 L96 107 L95 104.5 L92.5 103.5 L95 102.5 Z">
+                <animate attributeName="opacity" dur="0.45s" repeatCount="indefinite" values="0.8;0.1;0.8"/>
+              </path>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** minimal input row (Enter / context menu / ? for Help)
+- **Current tip:** animated ringing clock in the notification dialog
 - **Next bundle NNN:** 031
 
 ## Status
@@ -20,6 +20,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Notification dialog: animated ringing clock (`icons/alarm-ringing.svg`,
+  SMIL, played via QSvgRenderer) — hops side to side, rattles its bells,
+  radiates sound waves
 - Minimal input row: drop Add/Edit/Restart/Remove toolbar buttons; keep
   compact **?** for syntax help (F1). Actions via Enter, shortcuts, double-click,
   context menu

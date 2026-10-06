@@ -2,6 +2,7 @@
 <RCC version="1.0">
   <qresource prefix="/">
     <file>icons/alarm.svg</file>
+    <file>icons/alarm-ringing.svg</file>
     <file>sounds/alarm.wav</file>
   </qresource>
 </RCC>
