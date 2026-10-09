@@ -15,6 +15,7 @@ private slots:
     void relative_unit_spellings();
     void absolute_time_only();
     void absolute_full_date();
+    void absolute_next_weekday();
     void absolute_american_ampm();
     void absolute_glued_timezone();
     void notes_trailing_words();
@@ -115,6 +116,35 @@ void TestParser::absolute_full_date() {
     QVERIFY(c.has_value());
     QCOMPARE(c->triggerUtc.toLocalTime().date(), QDate(2099, 10, 6));
     QCOMPARE(c->triggerUtc.toLocalTime().time().hour(), 5);
+}
+
+void TestParser::absolute_next_weekday() {
+    auto a = AlarmManager::parse(QStringLiteral("next monday 5:50pm"));
+    QVERIFY(a.has_value());
+    QVERIFY(!a->recurrence.isRecurring());
+    QCOMPARE(a->command, QStringLiteral("next monday 5:50pm"));
+    QVERIFY(a->label.isEmpty());
+    const QDateTime local = a->triggerUtc.toLocalTime();
+    QCOMPARE(local.time().hour(), 17);
+    QCOMPARE(local.time().minute(), 50);
+    QCOMPARE(local.date().dayOfWeek(), 1); // Monday
+    QVERIFY(a->triggerUtc > QDateTime::currentDateTimeUtc());
+
+    auto b = AlarmManager::parse(QStringLiteral("next mon at 9:00 laundry"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("next mon at 9:00"));
+    QCOMPARE(b->label, QStringLiteral("laundry"));
+    QCOMPARE(b->triggerUtc.toLocalTime().time().hour(), 9);
+    QCOMPARE(b->triggerUtc.toLocalTime().date().dayOfWeek(), 1);
+
+    auto c = AlarmManager::parse(QStringLiteral("next friday 18:00"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().date().dayOfWeek(), 5); // Friday
+    QCOMPARE(c->triggerUtc.toLocalTime().time().hour(), 18);
+
+    // No time → invalid
+    QVERIFY(!AlarmManager::parse(QStringLiteral("next monday")).has_value());
+    QVERIFY(!AlarmManager::parse(QStringLiteral("next hamburger 5pm")).has_value());
 }
 
 void TestParser::absolute_american_ampm() {

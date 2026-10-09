@@ -349,6 +349,54 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
     return false;
 }
 
+/**
+ * One-shot "next <weekday> [at] <time>" — not recurring.
+ *   next monday 5:50pm
+ *   next mon at 17:50 laundry
+ *   next weekday 9:00
+ * Uses the same local-wall-clock / DST rules as weekly recurrence: the next
+ * matching weekday at that time that is strictly after now.
+ */
+static bool parseNextWeekday(const QString& input, QString* timePart, QString* note,
+                             QDateTime* triggerLocal, const QDateTime& nowLocal) {
+    static const QString kDay = QStringLiteral(
+        R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
+        R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
+    static const QString kTime = QStringLiteral(
+        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?)(?![\w:]))");
+
+    static const QRegularExpression nextRe(
+        QStringLiteral(R"(\Anext\s+()") + kDay
+            + QStringLiteral(R"()\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+
+    const auto m = nextRe.match(input);
+    if (!m.hasMatch())
+        return false;
+
+    const QTime time = parseTimeOfDay(m.captured(2));
+    if (!time.isValid())
+        return false;
+
+    const quint8 mask = dayTokenMask(m.captured(1).trimmed());
+    if (mask == 0)
+        return false;
+
+    Recurrence probe;
+    probe.kind = Recurrence::Kind::Weekly;
+    probe.time = time;
+    probe.weekdays = mask;
+    const QTimeZone zone = nowLocal.timeZone();
+    const QDateTime utc = probe.nextAfter(nowLocal.toUTC(), zone);
+    if (!utc.isValid())
+        return false;
+
+    *triggerLocal = utc.toTimeZone(zone);
+    *timePart = m.captured(0).trimmed();
+    *note = cleanNote(input.mid(m.capturedLength(0)));
+    return true;
+}
+
 // Split "time expression" + optional human note.
 // Supported note forms (first match wins):
 //   in 5s, kitchen
@@ -428,20 +476,23 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     QString note;
     Recurrence rec;
     const bool recurring = parseRecurring(trimmed, &timePart, &note, &rec);
-    if (!recurring)
-        splitTimeAndNote(trimmed, &timePart, &note);
 
     const QDateTime nowLocal = QDateTime::currentDateTime();
     QDateTime triggerLocal;
 
     if (recurring) {
         triggerLocal = rec.nextAfter(nowLocal.toUTC());
-    } else if (timePart.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
-        // Prefer relative if it looks like one
-        triggerLocal = parseRelative(timePart, nowLocal);
+    } else if (parseNextWeekday(trimmed, &timePart, &note, &triggerLocal, nowLocal)) {
+        // one-shot next <weekday> [at] <time>
+    } else {
+        splitTimeAndNote(trimmed, &timePart, &note);
+        if (timePart.contains(QRegularExpression(R"(\bin\b|\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption))) {
+            // Prefer relative if it looks like one
+            triggerLocal = parseRelative(timePart, nowLocal);
+        }
+        if (!triggerLocal.isValid())
+            triggerLocal = parseAbsolute(timePart, nowLocal);
     }
-    if (!triggerLocal.isValid() && !recurring)
-        triggerLocal = parseAbsolute(timePart, nowLocal);
     if (!triggerLocal.isValid())
         return std::nullopt;
 

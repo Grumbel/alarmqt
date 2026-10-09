@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** parse full dates with unpadded hour (`at 2026-10-06 5:00`)
-- **Next bundle NNN:** 032
+- **Current tip:** `next monday 5:50pm` one-shot absolute times
+- **Next bundle NNN:** 033
 
 ## Status
 
@@ -20,6 +20,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- `next monday 5:50pm` / `next mon at 9:00` — one-shot absolute at the next
+  matching weekday (local wall-clock, same DST rules as weekly recurrence);
+  optional note; not recurring
 - Full-date absolute times accept a single-digit hour (`at 2099-10-06 5:00`,
   `…T5:00:00`) — same as time-only `H:mm`; previously only zero-padded `HH`
 - Big clock shrinks to fit instead of cropping on resize; displayed times
@@ -46,4 +49,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-031.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-032.*.bundle` from artifacts (cumulative from `071e920`).

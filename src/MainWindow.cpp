@@ -314,6 +314,7 @@ void MainWindow::addFromInput() {
                                 "  at 15:10 team call\n"
                                 "  in 2h30m\n"
                                 "  at 2026-10-03 09:00\n"
+                                "  next monday 5:50pm\n"
                                 "  every 30m drink water\n"
                                 "  every monday at 18:00 laundry\n"
                                 "  every weekday at 9:00 standup\n\n"
@@ -360,6 +361,7 @@ void MainWindow::showSyntaxHelp() {
         "<li><code>at 15:10</code> &nbsp; <code>15:10</code></li>"
         "<li><code>6:00pm</code> &nbsp; <code>6am</code> &nbsp; <code>6:00 p.m.</code></li>"
         "<li><code>at 2026-10-03 09:00</code></li>"
+        "<li><code>next monday 5:50pm</code> &nbsp; <code>next mon at 9:00</code></li>"
         "</ul>"
 
         "<h3>Timezone on absolute times</h3>"
@@ -415,6 +417,7 @@ void MainWindow::showSyntaxHelp() {
         "<li><code>at 15:10CEST ship it</code></li>"
         "<li><code>in 2h30m</code></li>"
         "<li><code>at 2026-10-03 09:00</code></li>"
+        "<li><code>next monday 5:50pm</code></li>"
         "<li><code>every 30m drink water</code></li>"
         "<li><code>every monday at 18:00 laundry</code></li>"
         "<li><code>every weekday at 9:00 standup</code></li>"
