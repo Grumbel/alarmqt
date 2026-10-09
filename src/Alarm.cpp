@@ -102,3 +102,18 @@ QString Alarm::remainingString(const QDateTime& nowUtc) const {
     parts << QString("%1s").arg(secs);
     return parts.join(QLatin1Char(' '));
 }
+
+bool operator==(const Alarm& a, const Alarm& b) {
+    return a.id == b.id
+        && a.command == b.command
+        && a.label == b.label
+        && a.triggerUtc == b.triggerUtc
+        && a.scheduledUtc == b.scheduledUtc
+        && a.recurrence == b.recurrence
+        && a.snoozeMinutes == b.snoozeMinutes
+        && a.acknowledged == b.acknowledged
+        && a.triggered == b.triggered
+        && a.snoozed == b.snoozed
+        && a.missed == b.missed
+        && a.disabled == b.disabled;
+}

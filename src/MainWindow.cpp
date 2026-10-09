@@ -31,6 +31,11 @@
 #include <QSizePolicy>
 #include <QStatusBar>
 #include <QTextBrowser>
+#include <QUndoStack>
+#include <QUndoCommand>
+#include <QActionGroup>
+#include <QSettings>
+#include <QAction>
 
 #include <algorithm>
 
@@ -40,6 +45,37 @@ constexpr int kColStatus = 0;
 QIcon menuIcon(const char* name) {
     return QIcon(QStringLiteral(":/icons/%1").arg(QLatin1String(name)));
 }
+
+constexpr auto kSettingsOrg = "alarmqt";
+constexpr auto kSettingsApp = "alarmqt";
+constexpr auto kNotifyStyleKey = "notification/style";
+
+class AlarmListCommand : public QUndoCommand {
+public:
+    AlarmListCommand(AlarmManager* manager, QVector<Alarm> before, QVector<Alarm> after,
+                     const QString& text)
+        : QUndoCommand(text)
+        , m_manager(manager)
+        , m_before(std::move(before))
+        , m_after(std::move(after))
+    {}
+
+    void undo() override { m_manager->replaceAll(m_before); }
+    void redo() override {
+        // QUndoStack::push() calls redo() once; the mutation already ran.
+        if (m_fresh) {
+            m_fresh = false;
+            return;
+        }
+        m_manager->replaceAll(m_after);
+    }
+
+private:
+    AlarmManager* m_manager;
+    QVector<Alarm> m_before;
+    QVector<Alarm> m_after;
+    bool m_fresh = true;
+};
 constexpr int kColRemaining = 1;
 constexpr int kColWhen = 2;
 constexpr int kColCommand = 3;
@@ -243,12 +279,58 @@ void MainWindow::updateClock() {
     m_clock->setClockText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss")));
 }
 
+void MainWindow::withUndo(const QString& text, const std::function<void()>& action) {
+    const QVector<Alarm> before = m_manager->alarms();
+    action();
+    const QVector<Alarm> after = m_manager->alarms();
+    if (before == after)
+        return;
+    // First redo was already applied by action(); push without re-running redo.
+    m_undoStack.push(new AlarmListCommand(m_manager, before, after, text));
+}
+
+NotificationStyle MainWindow::currentNotificationStyle() const {
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    const int v = s.value(QString::fromLatin1(kNotifyStyleKey),
+                          int(NotificationStyle::Standard)).toInt();
+    switch (v) {
+    case int(NotificationStyle::Simple):
+        return NotificationStyle::Simple;
+    case int(NotificationStyle::Fullscreen):
+        return NotificationStyle::Fullscreen;
+    default:
+        return NotificationStyle::Standard;
+    }
+}
+
+void MainWindow::setNotificationStyle(NotificationStyle style) {
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    s.setValue(QString::fromLatin1(kNotifyStyleKey), int(style));
+}
+
 void MainWindow::createMenus() {
+
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
     {
         auto* a = fileMenu->addAction(menuIcon("menu-quit.svg"), tr("&Quit"),
                                       qApp, []() { QApplication::exit(0); });
         a->setShortcut(QKeySequence::Quit);
+    }
+
+    auto* editMenu = menuBar()->addMenu(tr("&Edit"));
+    m_undoAction = m_undoStack.createUndoAction(this, tr("&Undo"));
+    m_undoAction->setIcon(menuIcon("menu-undo.svg"));
+    m_undoAction->setShortcuts(QKeySequence::Undo);
+    editMenu->addAction(m_undoAction);
+    m_redoAction = m_undoStack.createRedoAction(this, tr("&Redo"));
+    m_redoAction->setIcon(menuIcon("menu-redo.svg"));
+    m_redoAction->setShortcuts(QKeySequence::Redo);
+    editMenu->addAction(m_redoAction);
+    editMenu->addSeparator();
+    {
+        auto* a = editMenu->addAction(menuIcon("menu-edit.svg"), tr("&Edit alarm…"),
+                                      this, &MainWindow::editSelected);
+        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     }
 
     auto* alarmMenu = menuBar()->addMenu(tr("&Alarm"));
@@ -258,11 +340,6 @@ void MainWindow::createMenus() {
             m_input->selectAll();
         });
         a->setShortcut(QKeySequence::New);
-    }
-    {
-        auto* a = alarmMenu->addAction(menuIcon("menu-edit.svg"), tr("&Edit…"),
-                                       this, &MainWindow::editSelected);
-        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     }
     {
         auto* a = alarmMenu->addAction(menuIcon("menu-restart.svg"), tr("&Restart"),
@@ -291,6 +368,22 @@ void MainWindow::createMenus() {
     alarmMenu->addAction(menuIcon("menu-clear.svg"), tr("Clear &DONE alarms"),
                          this, &MainWindow::clearDoneAlarms);
 
+    auto* settingsMenu = menuBar()->addMenu(tr("&Settings"));
+    auto* styleMenu = settingsMenu->addMenu(tr("Notification &style"));
+    auto* styleGroup = new QActionGroup(this);
+    styleGroup->setExclusive(true);
+    const NotificationStyle curStyle = currentNotificationStyle();
+    auto addStyle = [&](const QString& label, NotificationStyle st) {
+        auto* a = styleMenu->addAction(label);
+        a->setCheckable(true);
+        a->setChecked(curStyle == st);
+        styleGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [this, st]() { setNotificationStyle(st); });
+    };
+    addStyle(tr("Standard (side blinkers)"), NotificationStyle::Standard);
+    addStyle(tr("Simple (no side blinkers)"), NotificationStyle::Simple);
+    addStyle(tr("Fullscreen flash"), NotificationStyle::Fullscreen);
+
     auto* helpMenu = menuBar()->addMenu(tr("&Help"));
     {
         auto* a = helpMenu->addAction(menuIcon("menu-help.svg"), tr("Alarm time &syntax…"),
@@ -308,18 +401,20 @@ void MainWindow::disableSelected() {
         QMessageBox::information(this, tr("Disable"), tr("Select an alarm to disable."));
         return;
     }
-    int n = 0;
-    for (const QModelIndex& idx : rows) {
-        auto* item = m_table->item(idx.row(), kColStatus);
-        if (!item)
-            continue;
-        const QUuid id = item->data(kRoleId).toUuid();
-        if (m_manager->setDisabled(id, true))
-            ++n;
-    }
-    if (n == 0)
-        QMessageBox::information(this, tr("Disable"),
-                                 tr("Select an active (non-DONE) alarm to disable."));
+    withUndo(tr("Disable alarm(s)"), [this, rows]() {
+        int n = 0;
+        for (const QModelIndex& idx : rows) {
+            auto* item = m_table->item(idx.row(), kColStatus);
+            if (!item)
+                continue;
+            const QUuid id = item->data(kRoleId).toUuid();
+            if (m_manager->setDisabled(id, true))
+                ++n;
+        }
+        if (n == 0)
+            QMessageBox::information(this, tr("Disable"),
+                                     tr("Select an active (non-DONE) alarm to disable."));
+    });
 }
 
 void MainWindow::enableSelected() {
@@ -328,19 +423,21 @@ void MainWindow::enableSelected() {
         QMessageBox::information(this, tr("Enable"), tr("Select a disabled alarm to enable."));
         return;
     }
-    int n = 0;
-    for (const QModelIndex& idx : rows) {
-        auto* item = m_table->item(idx.row(), kColStatus);
-        if (!item)
-            continue;
-        const QUuid id = item->data(kRoleId).toUuid();
-        if (const Alarm* a = m_manager->alarmById(id); a && a->disabled)
-            if (m_manager->setDisabled(id, false))
-                ++n;
-    }
-    if (n == 0)
-        QMessageBox::information(this, tr("Enable"),
-                                 tr("Select a disabled alarm to enable."));
+    withUndo(tr("Enable alarm(s)"), [this, rows]() {
+        int n = 0;
+        for (const QModelIndex& idx : rows) {
+            auto* item = m_table->item(idx.row(), kColStatus);
+            if (!item)
+                continue;
+            const QUuid id = item->data(kRoleId).toUuid();
+            if (const Alarm* a = m_manager->alarmById(id); a && a->disabled)
+                if (m_manager->setDisabled(id, false))
+                    ++n;
+        }
+        if (n == 0)
+            QMessageBox::information(this, tr("Enable"),
+                                     tr("Select a disabled alarm to enable."));
+    });
 }
 
 void MainWindow::showAbout() {
@@ -438,7 +535,7 @@ void MainWindow::addFromInput() {
                                  .arg(text));
         return;
     }
-    m_manager->add(*opt);
+    withUndo(tr("Add alarm"), [this, opt]() { m_manager->add(*opt); });
     m_input->clear();
 }
 
@@ -584,18 +681,25 @@ void MainWindow::removeSelected() {
     if (ids.isEmpty())
         return;
 
-    const auto answer = QMessageBox::question(
-        this, tr("Remove alarms"),
-        tr("Permanently remove %1 selected alarm(s)?").arg(ids.size()));
-    if (answer != QMessageBox::Yes)
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(tr("Remove alarms"));
+    box.setText(tr("Permanently remove %1 selected alarm(s)?").arg(ids.size()));
+    auto* deleteBtn = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    box.setDefaultButton(deleteBtn);
+    box.exec();
+    if (box.clickedButton() != deleteBtn)
         return;
 
-    for (const QUuid& id : ids) {
-        m_manager->remove(id);
-        m_activeTriggered.remove(id);
-        if (auto* d = m_dialogs.take(id))
-            d->deleteLater();
-    }
+    withUndo(tr("Remove %1 alarm(s)").arg(ids.size()), [this, ids]() {
+        for (const QUuid& id : ids) {
+            m_manager->remove(id);
+            m_activeTriggered.remove(id);
+            if (auto* d = m_dialogs.take(id))
+                d->deleteLater();
+        }
+    });
 }
 
 void MainWindow::clearDoneAlarms() {
@@ -606,12 +710,17 @@ void MainWindow::clearDoneAlarms() {
         QMessageBox::information(this, tr("Clear DONE"), tr("No DONE alarms to clear."));
         return;
     }
-    const auto answer = QMessageBox::question(
-        this, tr("Clear DONE"),
-        tr("Permanently remove %1 DONE alarm(s)?").arg(n));
-    if (answer != QMessageBox::Yes)
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(tr("Clear DONE"));
+    box.setText(tr("Permanently remove %1 DONE alarm(s)?").arg(n));
+    auto* deleteBtn = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    box.setDefaultButton(deleteBtn);
+    box.exec();
+    if (box.clickedButton() != deleteBtn)
         return;
-    m_manager->clearDone();
+    withUndo(tr("Clear DONE alarms"), [this]() { m_manager->clearDone(); });
 }
 
 void MainWindow::restartSelected() {
@@ -620,16 +729,18 @@ void MainWindow::restartSelected() {
         QMessageBox::information(this, tr("Restart"), tr("Select an alarm to restart."));
         return;
     }
-    for (const QModelIndex& idx : rows) {
-        auto* item = m_table->item(idx.row(), kColStatus);
-        if (!item)
-            continue;
-        const QUuid id = item->data(kRoleId).toUuid();
-        m_activeTriggered.remove(id);
-        if (auto* d = m_dialogs.take(id))
-            d->deleteLater();
-        m_manager->restart(id);
-    }
+    withUndo(tr("Restart alarm(s)"), [this, rows]() {
+        for (const QModelIndex& idx : rows) {
+            auto* item = m_table->item(idx.row(), kColStatus);
+            if (!item)
+                continue;
+            const QUuid id = item->data(kRoleId).toUuid();
+            m_activeTriggered.remove(id);
+            if (auto* d = m_dialogs.take(id))
+                d->deleteLater();
+            m_manager->restart(id);
+        }
+    });
 }
 
 void MainWindow::skipSelected() {
@@ -647,9 +758,10 @@ void MainWindow::skipSelected() {
                                  tr("Select a repeating alarm to skip its next occurrence."));
         return;
     }
-    // skipNext() closes open notifications via alarmAcknowledged.
-    for (const QUuid& id : ids)
-        m_manager->skipNext(id);
+    withUndo(tr("Skip next"), [this, ids]() {
+        for (const QUuid& id : ids)
+            m_manager->skipNext(id);
+    });
 }
 
 void MainWindow::onTableContextMenu(const QPoint& pos) {
@@ -805,11 +917,12 @@ bool MainWindow::editAlarm(const QUuid& id) {
     updated.snoozed = false;
     updated.missed = false;
 
-    m_manager->update(updated);
-    // Any open notification belongs to the old schedule.
-    m_activeTriggered.remove(id);
-    if (auto* d = m_dialogs.take(id))
-        d->deleteLater();
+    withUndo(tr("Edit alarm"), [this, updated, id]() {
+        m_manager->update(updated);
+        m_activeTriggered.remove(id);
+        if (auto* d = m_dialogs.take(id))
+            d->deleteLater();
+    });
     return true;
 }
 
@@ -974,7 +1087,7 @@ void MainWindow::showNotification(const Alarm& a) {
         return;
     }
 
-    auto* dlg = new NotificationDialog(a, this);
+    auto* dlg = new NotificationDialog(a, currentNotificationStyle(), this);
     m_dialogs.insert(a.id, dlg);
 
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {

@@ -37,3 +37,7 @@ struct Alarm {
     qint64 remainingMs(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
     bool isDue(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
 };
+
+bool operator==(const Alarm& a, const Alarm& b);
+inline bool operator!=(const Alarm& a, const Alarm& b) { return !(a == b); }
+

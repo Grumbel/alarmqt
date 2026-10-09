@@ -972,7 +972,15 @@ bool AlarmManager::setDisabled(const QUuid& id, bool disabled) {
     return true;
 }
 
+void AlarmManager::replaceAll(const QVector<Alarm>& alarms) {
+    m_alarms = alarms;
+    sortAlarms();
+    save();
+    emit alarmsChanged();
+}
+
 void AlarmManager::tick() {
+
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
     // Collect first: receivers may modify the alarm list (ack, snooze, ...).

@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** colorful SVG icons on all menu entries
-- **Next bundle NNN:** 040
+- **Current tip:** notification styles, Delete/Cancel, Edit/Undo/Redo
+- **Next bundle NNN:** 041
 
 ## Status
 
@@ -19,6 +19,11 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Notification styles (Settings): Standard (side blinkers), Simple (no
+  strips), Fullscreen flash — persisted in QSettings
+- Delete confirmation uses Delete/Cancel (not Yes/No)
+- Edit menu with Undo/Redo (Ctrl+Z / Ctrl+Shift+Z) for list mutations;
+  Edit alarm stays under Edit
 - Classic colorful SVG icons on main menu, context menu, and tray menu
 - Main menu bar (File / Alarm / Help) with standard actions and About
 - Disable / Enable alarms (right-click, Alarm menu, Ctrl+P): paused state
@@ -35,4 +40,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-039.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-040.*.bundle` from artifacts (cumulative from `071e920`).

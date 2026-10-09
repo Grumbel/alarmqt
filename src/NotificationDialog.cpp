@@ -18,14 +18,15 @@
 namespace {
 constexpr int kBlinkIntervalMs = 250;
 constexpr int kSoundIntervalMs = 1500;
-constexpr int kStripWidth = 48; // full-height side panels
+constexpr int kStripWidth = 48;
 
-const char* kStyleRed =
-    "QFrame { background-color: #e53e3e; border: none; }";
-const char* kStyleBlack =
-    "QFrame { background-color: #000000; border: none; }";
+const char* kStyleRed = "QFrame { background-color: #e53e3e; border: none; }";
+const char* kStyleBlack = "QFrame { background-color: #000000; border: none; }";
+const char* kFullscreenRed =
+    "QWidget#flashRoot { background-color: #e53e3e; }";
+const char* kFullscreenBlack =
+    "QWidget#flashRoot { background-color: #1a0000; }";
 
-// Plays the animated (SMIL) ringing clock; QSvgRenderer drives the frames.
 class RingingClock : public QWidget {
 public:
     explicit RingingClock(QWidget* parent = nullptr)
@@ -46,105 +47,118 @@ protected:
 private:
     QSvgRenderer m_renderer;
 };
-} // namespace
 
-NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
-    : QDialog(parent)
-    , m_alarm(alarm)
+QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** whenOut,
+                            QLabel** subtitleOut, QWidget* parent,
+                            bool large)
 {
-    setWindowTitle(tr("Alarm – %1").arg(alarm.displayName()));
-    setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint);
-    setAttribute(Qt::WA_DeleteOnClose);
-    setModal(false);
-    setMinimumWidth(440);
-    setMinimumHeight(180);
-
-    // Default system grey background; only the full-height side strips flash.
-
-    // Side strips flush to the dialog edges, full height.
-    auto* root = new QHBoxLayout(this);
-    root->setSpacing(0);
-    root->setContentsMargins(0, 0, 0, 0);
-
-    auto makeStrip = [](QFrame** out) {
-        auto* strip = new QFrame;
-        strip->setFixedWidth(kStripWidth);
-        strip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-        strip->setStyleSheet(QString::fromUtf8(kStyleBlack));
-        *out = strip;
-        return strip;
-    };
-
-    auto* leftCol = makeStrip(&m_leftBlink);
-    auto* rightCol = makeStrip(&m_rightBlink);
-
-    auto* center = new QWidget;
+    auto* center = new QWidget(parent);
     auto* centerLayout = new QVBoxLayout(center);
-    centerLayout->setContentsMargins(16, 16, 16, 16);
+    centerLayout->setContentsMargins(large ? 32 : 16, large ? 32 : 16, large ? 32 : 16,
+                                     large ? 32 : 16);
 
-    m_title = new QLabel(alarm.displayName());
-    m_title->setAlignment(Qt::AlignCenter);
-    QFont titleFont = m_title->font();
-    titleFont.setPointSize(titleFont.pointSize() + 6);
+    auto* title = new QLabel(alarm.displayName());
+    title->setAlignment(Qt::AlignCenter);
+    QFont titleFont = title->font();
+    titleFont.setPointSize(titleFont.pointSize() + (large ? 14 : 6));
     titleFont.setBold(true);
-    m_title->setFont(titleFont);
-    m_title->setWordWrap(true);
+    title->setFont(titleFont);
+    title->setWordWrap(true);
+    if (large)
+        title->setStyleSheet(QStringLiteral("color: #ffffff;"));
 
     const QDateTime whenLocal = (alarm.scheduledUtc.isValid() ? alarm.scheduledUtc : alarm.triggerUtc)
                                     .toLocalTime();
-    QString whenText = tr("When: %1").arg(
+    QString whenText = QObject::tr("When: %1").arg(
         whenLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
     if (alarm.recurrence.isRecurring())
-        whenText += tr("  ·  repeats %1").arg(alarm.recurrence.describe());
-    m_when = new QLabel(whenText);
-    m_when->setAlignment(Qt::AlignCenter);
+        whenText += QObject::tr("  ·  repeats %1").arg(alarm.recurrence.describe());
+    auto* when = new QLabel(whenText);
+    when->setAlignment(Qt::AlignCenter);
+    if (large)
+        when->setStyleSheet(QStringLiteral("color: #ffe4e4; font-size: 16px;"));
 
+    QLabel* subtitle = nullptr;
     if (alarm.missed) {
-        m_subtitle = new QLabel(tr("Missed — app was not running at the scheduled time"));
-        m_subtitle->setStyleSheet(QStringLiteral("color: #c53030; font-weight: bold;"));
+        subtitle = new QLabel(QObject::tr("Missed — app was not running at the scheduled time"));
+        subtitle->setStyleSheet(large
+                                    ? QStringLiteral("color: #ffd0d0; font-weight: bold; font-size: 18px;")
+                                    : QStringLiteral("color: #c53030; font-weight: bold;"));
     } else {
-        m_subtitle = new QLabel(tr("Time is up!"));
+        subtitle = new QLabel(QObject::tr("Time is up!"));
+        if (large)
+            subtitle->setStyleSheet(QStringLiteral("color: #ffffff; font-size: 22px; font-weight: bold;"));
     }
-    m_subtitle->setAlignment(Qt::AlignCenter);
-    m_subtitle->setWordWrap(true);
+    subtitle->setAlignment(Qt::AlignCenter);
+    subtitle->setWordWrap(true);
 
     centerLayout->addStretch(1);
-    centerLayout->addWidget(new RingingClock, 0, Qt::AlignHCenter);
-    centerLayout->addWidget(m_title);
-    centerLayout->addWidget(m_when);
-    centerLayout->addWidget(m_subtitle);
-    centerLayout->addSpacing(12);
-
-    auto* btnLayout = new QHBoxLayout;
-    auto* snooze5 = new QPushButton(tr("Snooze 5m"));
-    auto* snooze10 = new QPushButton(tr("Snooze 10m"));
-    // Recurring alarms re-arm on acknowledge instead of becoming DONE.
-    auto* ackBtn = new QPushButton(alarm.recurrence.isRecurring()
-                                       ? tr("Acknowledge, repeat (Enter)")
-                                       : tr("Acknowledge (Enter)"));
-    ackBtn->setDefault(true);
-    btnLayout->addWidget(snooze5);
-    btnLayout->addWidget(snooze10);
-    btnLayout->addWidget(ackBtn);
-    centerLayout->addLayout(btnLayout);
+    auto* clock = new RingingClock;
+    if (large) {
+        const QSize base = clock->sizeHint().isEmpty() ? QSize(96, 96) : clock->sizeHint();
+        clock->setFixedSize(base * 3 / 2);
+    }
+    centerLayout->addWidget(clock, 0, Qt::AlignHCenter);
+    centerLayout->addWidget(title);
+    centerLayout->addWidget(when);
+    centerLayout->addWidget(subtitle);
     centerLayout->addStretch(1);
 
-    root->addWidget(leftCol);
-    root->addWidget(center, 1);
-    root->addWidget(rightCol);
+    *titleOut = title;
+    *whenOut = when;
+    *subtitleOut = subtitle;
+    return center;
+}
 
-    connect(ackBtn, &QPushButton::clicked, this, [this]() {
-        emit acknowledged(m_alarm.id);
-        accept();
+QHBoxLayout* buildButtons(QWidget* parent, NotificationDialog* dlg, const Alarm& alarm)
+{
+    auto* row = new QHBoxLayout;
+    row->setSpacing(12);
+
+    auto* ack = new QPushButton(QObject::tr("Acknowledge"), parent);
+    ack->setDefault(true);
+    ack->setMinimumHeight(36);
+    auto* snooze5 = new QPushButton(QObject::tr("Snooze 5m"), parent);
+    auto* snooze10 = new QPushButton(QObject::tr("Snooze 10m"), parent);
+    snooze5->setMinimumHeight(36);
+    snooze10->setMinimumHeight(36);
+
+    QObject::connect(ack, &QPushButton::clicked, dlg, [dlg, id = alarm.id]() {
+        emit dlg->acknowledged(id);
+        dlg->accept();
     });
-    connect(snooze5, &QPushButton::clicked, this, [this]() {
-        emit snoozed(m_alarm.id, 5);
-        accept();
+    QObject::connect(snooze5, &QPushButton::clicked, dlg, [dlg, id = alarm.id]() {
+        emit dlg->snoozed(id, 5);
+        dlg->accept();
     });
-    connect(snooze10, &QPushButton::clicked, this, [this]() {
-        emit snoozed(m_alarm.id, 10);
-        accept();
+    QObject::connect(snooze10, &QPushButton::clicked, dlg, [dlg, id = alarm.id]() {
+        emit dlg->snoozed(id, 10);
+        dlg->accept();
     });
+
+    row->addStretch(1);
+    row->addWidget(ack);
+    row->addWidget(snooze5);
+    row->addWidget(snooze10);
+    row->addStretch(1);
+    return row;
+}
+} // namespace
+
+NotificationDialog::NotificationDialog(const Alarm& alarm, NotificationStyle style,
+                                       QWidget* parent)
+    : QDialog(parent)
+    , m_alarm(alarm)
+    , m_style(style)
+{
+    setWindowTitle(tr("Alarm – %1").arg(alarm.displayName()));
+    setAttribute(Qt::WA_DeleteOnClose);
+    setModal(false);
+
+    if (m_style == NotificationStyle::Fullscreen)
+        buildFullscreen();
+    else
+        buildStandardOrSimple();
 
     m_sound = new QSoundEffect(this);
     m_sound->setSource(QUrl(QStringLiteral("qrc:/sounds/alarm.wav")));
@@ -154,8 +168,8 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     connect(&m_blinkTimer, &QTimer::timeout, this, [this]() {
         if (m_closing)
             return;
-        m_leftRed = !m_leftRed;
-        setBlinkPhase(m_leftRed);
+        m_blinkOn = !m_blinkOn;
+        setBlinkPhase(m_blinkOn);
     });
     m_blinkTimer.start(kBlinkIntervalMs);
 
@@ -168,15 +182,87 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, QWidget* parent)
     setBlinkPhase(true);
     playSound();
 
-    adjustSize();
-    if (auto* screen = QApplication::primaryScreen()) {
-        const QRect geo = screen->availableGeometry();
-        move(geo.center() - QPoint(width() / 2, height() / 2));
+    if (m_style == NotificationStyle::Fullscreen) {
+        showFullScreen();
+    } else {
+        adjustSize();
+        if (auto* screen = QApplication::primaryScreen()) {
+            const QRect geo = screen->availableGeometry();
+            move(geo.center() - QPoint(width() / 2, height() / 2));
+        }
+        show();
     }
-
-    show();
     raise();
     activateWindow();
+}
+
+void NotificationDialog::buildStandardOrSimple()
+{
+    setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::WindowCloseButtonHint);
+    setMinimumWidth(440);
+    setMinimumHeight(180);
+
+    auto* root = new QHBoxLayout(this);
+    root->setSpacing(0);
+    root->setContentsMargins(0, 0, 0, 0);
+
+    const bool withStrips = (m_style == NotificationStyle::Standard);
+
+    if (withStrips) {
+        auto makeStrip = [](QFrame** out) {
+            auto* strip = new QFrame;
+            strip->setFixedWidth(kStripWidth);
+            strip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+            strip->setStyleSheet(QString::fromUtf8(kStyleBlack));
+            *out = strip;
+            return strip;
+        };
+        root->addWidget(makeStrip(&m_leftBlink));
+    }
+
+    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, this, false);
+    auto* centerLayout = qobject_cast<QVBoxLayout*>(center->layout());
+    centerLayout->addLayout(buildButtons(center, this, m_alarm));
+    root->addWidget(center, 1);
+
+    if (withStrips)
+        root->addWidget([&]() {
+            auto* strip = new QFrame;
+            strip->setFixedWidth(kStripWidth);
+            strip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+            strip->setStyleSheet(QString::fromUtf8(kStyleBlack));
+            m_rightBlink = strip;
+            return strip;
+        }());
+}
+
+void NotificationDialog::buildFullscreen()
+{
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    setWindowState(Qt::WindowFullScreen);
+
+    m_flashRoot = new QWidget(this);
+    m_flashRoot->setObjectName(QStringLiteral("flashRoot"));
+    m_flashRoot->setStyleSheet(QString::fromUtf8(kFullscreenBlack));
+
+    auto* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->addWidget(m_flashRoot);
+
+    auto* root = new QVBoxLayout(m_flashRoot);
+    root->setContentsMargins(40, 40, 40, 40);
+
+    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, m_flashRoot, true);
+    root->addWidget(center, 1);
+
+    auto* btnWrap = new QWidget(m_flashRoot);
+    btnWrap->setStyleSheet(QStringLiteral(
+        "QPushButton { font-size: 16px; min-width: 140px; padding: 10px 18px; }"));
+    auto* btnLayout = new QHBoxLayout(btnWrap);
+    btnLayout->setContentsMargins(0, 0, 0, 0);
+    auto* buttons = buildButtons(btnWrap, this, m_alarm);
+    btnLayout->addLayout(buttons);
+    root->addWidget(btnWrap);
 }
 
 NotificationDialog::~NotificationDialog() {
@@ -187,9 +273,8 @@ void NotificationDialog::stopAlert() {
     m_closing = true;
     m_blinkTimer.stop();
     m_soundTimer.stop();
-    if (m_sound) {
+    if (m_sound)
         m_sound->stop();
-    }
 }
 
 void NotificationDialog::done(int r) {
@@ -197,9 +282,17 @@ void NotificationDialog::done(int r) {
     QDialog::done(r);
 }
 
-void NotificationDialog::setBlinkPhase(bool leftRed) {
-    m_leftBlink->setStyleSheet(QString::fromUtf8(leftRed ? kStyleRed : kStyleBlack));
-    m_rightBlink->setStyleSheet(QString::fromUtf8(leftRed ? kStyleBlack : kStyleRed));
+void NotificationDialog::setBlinkPhase(bool on) {
+    if (m_style == NotificationStyle::Fullscreen && m_flashRoot) {
+        m_flashRoot->setStyleSheet(
+            QString::fromUtf8(on ? kFullscreenRed : kFullscreenBlack));
+        return;
+    }
+    if (m_style == NotificationStyle::Standard && m_leftBlink && m_rightBlink) {
+        m_leftBlink->setStyleSheet(QString::fromUtf8(on ? kStyleRed : kStyleBlack));
+        m_rightBlink->setStyleSheet(QString::fromUtf8(on ? kStyleBlack : kStyleRed));
+    }
+    // Simple: no visual blink strips
 }
 
 void NotificationDialog::playSound() {
@@ -229,8 +322,6 @@ void NotificationDialog::keyPressEvent(QKeyEvent* event) {
 
 void NotificationDialog::closeEvent(QCloseEvent* event) {
     if (!m_closing && event->spontaneous()) {
-        // Window manager close → treat as snooze. Programmatic closes (e.g.
-        // application shutdown) leave the alarm due.
         emit snoozed(m_alarm.id, 5);
     }
     stopAlert();

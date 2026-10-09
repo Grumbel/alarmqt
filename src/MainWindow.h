@@ -15,6 +15,8 @@
 #include <QHash>
 #include <QTimer>
 #include <QSet>
+#include <functional>
+#include <QUndoStack>
 
 class ClockLabel;
 
@@ -50,12 +52,16 @@ private slots:
     void renotifyTriggered();
     void showSyntaxHelp();
     void showAbout();
+    void setNotificationStyle(NotificationStyle style);
 
 private:
     void createTray();
     void createMenus();
     void showNotification(const Alarm& a);
     bool editAlarm(const QUuid& id);
+    /** Run a mutating action under the undo stack (snapshot before/after). */
+    void withUndo(const QString& text, const std::function<void()>& action);
+    NotificationStyle currentNotificationStyle() const;
 
     AlarmManager* m_manager;
     QLabel* m_clockIcon = nullptr;
@@ -69,4 +75,7 @@ private:
     QTimer m_renotifyTimer;
     QTimer m_rowBlinkTimer;
     bool m_rowBlinkOn = false;
+    QUndoStack m_undoStack;
+    QAction* m_undoAction = nullptr;
+    QAction* m_redoAction = nullptr;
 };

@@ -43,6 +43,9 @@ public:
     void load();
     void save() const;
 
+    /** Replace the entire alarm list (used by undo/redo). Emits alarmsChanged. */
+    void replaceAll(const QVector<Alarm>& alarms);
+
     // Next non-acknowledged alarm (soonest)
     std::optional<Alarm> nextAlarm() const;
 

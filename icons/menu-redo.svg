@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="b" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7ec8f5"/>
+      <stop offset="100%" stop-color="#2b7cb5"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 6 L26 12 L18 18 Z" fill="url(#b)" stroke="#1a4f78" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M22 12 H14 C10 12 6 15 6 20 C6 24 9 27 13 27 H20"
+        fill="none" stroke="url(#b)" stroke-width="3.2" stroke-linecap="round"/>
+</svg>
