@@ -21,6 +21,21 @@ static QString ordinalDay(int day) {
     }
 }
 
+static QString ordinalWord(int n) {
+    if (n < 0)
+        return QStringLiteral("last");
+    switch (n) {
+    case 1:
+        return QStringLiteral("1st");
+    case 2:
+        return QStringLiteral("2nd");
+    case 3:
+        return QStringLiteral("3rd");
+    default:
+        return QStringLiteral("%1th").arg(n);
+    }
+}
+
 QDateTime Recurrence::nextAfter(const QDateTime& afterUtc, const QTimeZone& zone) const {
     switch (kind) {
     case Kind::None:
@@ -34,27 +49,90 @@ QDateTime Recurrence::nextAfter(const QDateTime& afterUtc, const QTimeZone& zone
     case Kind::Weekly: {
         if (!time.isValid() || (weekdays & kEveryDay) == 0)
             return {};
-        // Build each candidate from the calendar date and wall-clock time in
-        // `zone` rather than adding 24h steps, so DST shifts keep the local
-        // time. A time inside a spring-forward gap is moved past the gap by
-        // QDateTime. Eight days always reach the next matching weekday.
+        const int stride = weekStride > 0 ? weekStride : 1;
         const QDate start = afterUtc.toTimeZone(zone).date();
-        for (int i = 0; i <= 8; ++i) {
+        // Search enough days for stride weeks of candidates.
+        for (int i = 0; i <= 7 * stride + 1; ++i) {
             const QDate date = start.addDays(i);
             if (!(weekdays & (1 << (date.dayOfWeek() - 1))))
                 continue;
             const QDateTime candidate(date, time, zone);
-            if (candidate.isValid() && candidate.toUTC() > afterUtc)
+            if (!candidate.isValid() || candidate.toUTC() <= afterUtc)
+                continue;
+            if (stride <= 1)
+                return candidate.toUTC();
+            // Align to weekStride using ISO week distance from a fixed epoch Monday.
+            const QDate epoch(1970, 1, 5); // Monday
+            const qint64 weeks = epoch.daysTo(date) / 7;
+            if (weeks % stride == 0)
+                return candidate.toUTC();
+        }
+        // stride>1: keep searching further
+        for (int i = 7 * stride + 2; i <= 7 * stride * 4; ++i) {
+            const QDate date = start.addDays(i);
+            if (!(weekdays & (1 << (date.dayOfWeek() - 1))))
+                continue;
+            const QDateTime candidate(date, time, zone);
+            if (!candidate.isValid() || candidate.toUTC() <= afterUtc)
+                continue;
+            const QDate epoch(1970, 1, 5);
+            const qint64 weeks = epoch.daysTo(date) / 7;
+            if (weeks % stride == 0)
                 return candidate.toUTC();
         }
         return {};
     }
 
     case Kind::Monthly: {
-        if (!time.isValid() || dayOfMonth < 1 || dayOfMonth > 31)
+        if (!time.isValid())
             return {};
-        // Local wall-clock: pick dayOfMonth in zone; skip months that lack it
-        // (31 in February, etc.). Search up to 48 months ahead.
+        // Nth weekday of month (weekOrdinal != 0)
+        if (weekOrdinal != 0 && weekdays != 0) {
+            int weekday = -1;
+            for (int d = 0; d < 7; ++d) {
+                if (weekdays & (1 << d)) {
+                    weekday = d + 1; // Qt: Mon=1
+                    break;
+                }
+            }
+            if (weekday < 1)
+                return {};
+            const QDate start = afterUtc.toTimeZone(zone).date();
+            int year = start.year();
+            int month = start.month();
+            for (int i = 0; i < 48; ++i) {
+                QDate candidateDate;
+                if (weekOrdinal > 0) {
+                    // Nth weekday: first day of month, advance to weekday, +7*(n-1)
+                    QDate d(year, month, 1);
+                    int delta = (weekday - d.dayOfWeek() + 7) % 7;
+                    d = d.addDays(delta + 7 * (weekOrdinal - 1));
+                    if (d.month() == month)
+                        candidateDate = d;
+                } else {
+                    // Last weekday: last day of month, walk back
+                    QDate d(year, month, QDate(year, month, 1).daysInMonth());
+                    while (d.dayOfWeek() != weekday)
+                        d = d.addDays(-1);
+                    candidateDate = d;
+                }
+                if (candidateDate.isValid()) {
+                    const QDateTime candidate(candidateDate, time, zone);
+                    if (candidate.isValid() && candidate.toUTC() > afterUtc)
+                        return candidate.toUTC();
+                }
+                ++month;
+                if (month > 12) {
+                    month = 1;
+                    ++year;
+                }
+            }
+            return {};
+        }
+
+        // Calendar day-of-month
+        if (dayOfMonth < 1 || dayOfMonth > 31)
+            return {};
         const QDate start = afterUtc.toTimeZone(zone).date();
         int year = start.year();
         int month = start.month();
@@ -72,6 +150,22 @@ QDateTime Recurrence::nextAfter(const QDateTime& afterUtc, const QTimeZone& zone
                 month = 1;
                 ++year;
             }
+        }
+        return {};
+    }
+
+    case Kind::Yearly: {
+        if (!time.isValid() || month < 1 || month > 12 || dayOfMonth < 1 || dayOfMonth > 31)
+            return {};
+        const QDate start = afterUtc.toTimeZone(zone).date();
+        int year = start.year();
+        for (int i = 0; i < 20; ++i) {
+            if (QDate::isValid(year, month, dayOfMonth)) {
+                const QDateTime candidate(QDate(year, month, dayOfMonth), time, zone);
+                if (candidate.isValid() && candidate.toUTC() > afterUtc)
+                    return candidate.toUTC();
+            }
+            ++year;
         }
         return {};
     }
@@ -106,13 +200,13 @@ QString Recurrence::describe() const {
         const QString t = time.toString(time.second() ? QStringLiteral("HH:mm:ss")
                                                       : QStringLiteral("HH:mm"));
         QString days;
-        if (weekdays == kEveryDay) {
+        if (weekdays == kEveryDay)
             days = QStringLiteral("daily");
-        } else if (weekdays == kWeekdays) {
+        else if (weekdays == kWeekdays)
             days = QStringLiteral("weekdays");
-        } else if (weekdays == kWeekend) {
+        else if (weekdays == kWeekend)
             days = QStringLiteral("weekends");
-        } else {
+        else {
             QStringList names;
             const QLocale c = QLocale::c();
             for (int d = 1; d <= 7; ++d)
@@ -120,12 +214,33 @@ QString Recurrence::describe() const {
                     names << c.dayName(d, QLocale::ShortFormat);
             days = names.join(QStringLiteral(", "));
         }
+        if (weekStride > 1)
+            return QStringLiteral("every %1 weeks %2 %3").arg(weekStride).arg(days, t);
         return days + QLatin1Char(' ') + t;
     }
     case Kind::Monthly: {
         const QString t = time.toString(time.second() ? QStringLiteral("HH:mm:ss")
                                                       : QStringLiteral("HH:mm"));
+        if (weekOrdinal != 0 && weekdays != 0) {
+            QString dayName;
+            const QLocale c = QLocale::c();
+            for (int d = 1; d <= 7; ++d)
+                if (weekdays & (1 << (d - 1))) {
+                    dayName = c.dayName(d, QLocale::ShortFormat);
+                    break;
+                }
+            return QStringLiteral("monthly %1 %2 %3")
+                .arg(ordinalWord(weekOrdinal), dayName, t);
+        }
         return QStringLiteral("monthly %1 %2").arg(ordinalDay(dayOfMonth), t);
+    }
+    case Kind::Yearly: {
+        const QString t = time.toString(time.second() ? QStringLiteral("HH:mm:ss")
+                                                      : QStringLiteral("HH:mm"));
+        return QStringLiteral("yearly %1-%2 %3")
+            .arg(month, 2, 10, QLatin1Char('0'))
+            .arg(dayOfMonth, 2, 10, QLatin1Char('0'))
+            .arg(t);
     }
     }
     return {};
@@ -144,10 +259,23 @@ QJsonObject Recurrence::toJson() const {
         o["kind"] = QStringLiteral("weekly");
         o["time"] = time.toString(QStringLiteral("HH:mm:ss"));
         o["weekdays"] = weekdays;
+        if (weekStride > 1)
+            o["weekStride"] = weekStride;
         break;
     case Kind::Monthly:
         o["kind"] = QStringLiteral("monthly");
         o["time"] = time.toString(QStringLiteral("HH:mm:ss"));
+        if (weekOrdinal != 0) {
+            o["weekOrdinal"] = weekOrdinal;
+            o["weekdays"] = weekdays;
+        } else {
+            o["dayOfMonth"] = dayOfMonth;
+        }
+        break;
+    case Kind::Yearly:
+        o["kind"] = QStringLiteral("yearly");
+        o["time"] = time.toString(QStringLiteral("HH:mm:ss"));
+        o["month"] = month;
         o["dayOfMonth"] = dayOfMonth;
         break;
     }
@@ -166,13 +294,31 @@ Recurrence Recurrence::fromJson(const QJsonObject& obj) {
         r.kind = Kind::Weekly;
         r.time = QTime::fromString(obj["time"].toString(), QStringLiteral("HH:mm:ss"));
         r.weekdays = static_cast<quint8>(obj["weekdays"].toInt() & kEveryDay);
+        r.weekStride = obj.contains(QStringLiteral("weekStride")) ? obj["weekStride"].toInt() : 1;
+        if (r.weekStride < 1)
+            r.weekStride = 1;
         if (!r.time.isValid() || r.weekdays == 0)
             r = {};
     } else if (kind == QLatin1String("monthly")) {
         r.kind = Kind::Monthly;
         r.time = QTime::fromString(obj["time"].toString(), QStringLiteral("HH:mm:ss"));
+        if (obj.contains(QStringLiteral("weekOrdinal"))) {
+            r.weekOrdinal = obj["weekOrdinal"].toInt();
+            r.weekdays = static_cast<quint8>(obj["weekdays"].toInt() & kEveryDay);
+            if (!r.time.isValid() || r.weekOrdinal == 0 || r.weekdays == 0)
+                r = {};
+        } else {
+            r.dayOfMonth = obj["dayOfMonth"].toInt();
+            if (!r.time.isValid() || r.dayOfMonth < 1 || r.dayOfMonth > 31)
+                r = {};
+        }
+    } else if (kind == QLatin1String("yearly")) {
+        r.kind = Kind::Yearly;
+        r.time = QTime::fromString(obj["time"].toString(), QStringLiteral("HH:mm:ss"));
+        r.month = obj["month"].toInt();
         r.dayOfMonth = obj["dayOfMonth"].toInt();
-        if (!r.time.isValid() || r.dayOfMonth < 1 || r.dayOfMonth > 31)
+        if (!r.time.isValid() || r.month < 1 || r.month > 12 || r.dayOfMonth < 1
+            || r.dayOfMonth > 31)
             r = {};
     }
     return r;

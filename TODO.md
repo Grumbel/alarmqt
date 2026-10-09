@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** relative `in N years`
-- **Next bundle NNN:** 037
+- **Current tip:** parser extensions — combined relative, synonyms, this/next week, yearly, nth weekday, biweekly, eod, bare hour
+- **Next bundle NNN:** 038
 
 ## Status
 
@@ -18,54 +18,18 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 - [ ] Mute / volume for notification sound
 - [ ] Shell completions (bash/zsh/fish)
 
-## Parser extension ideas (not committed)
-
-- Combined calendar units: `in 1 year 2 months`, `in 2 weeks 3 days`
-- `this friday 18:00` (this week if still future, else next)
-- `next week` / `next week monday 9:00`
-- Yearly recurrence: `every year on 10-06 at 9:00` / `yearly on Oct 6`
-- `until` / count on recurring rules
-- Half-hour synonyms: `in half an hour`, `in a quarter hour`
-- `end of day` / `eod` as time tokens
-- ISO week dates, bare `+5m` CLI form — low priority
-
 ## Done recently
 
-- Relative `in 3 years` / `1 year` (calendar `addYears`, same path as months)
-- Test: `in 3 months` is valid; invalid_inputs rejects `in 3 decades` instead
-- Monthly recurrence: `every month on the 6th at 9:00`, `monthly on 15 at 18:00`,
-  `each month on the 1st 9am` — local wall-clock; months lacking that day are
-  skipped (e.g. 31st in February)
-- Parser: `today`/`tomorrow` + time; bare weekday (`monday 9:00`, `next` optional);
-  `in 2 weeks` / `in 1 month`; full date + am/pm (`at 2026-10-06 5:00pm`);
-  `noon` / `midnight` as time tokens
-- `next monday 5:50pm` / `next mon at 9:00` — one-shot absolute at the next
-  matching weekday (local wall-clock, same DST rules as weekly recurrence);
-  optional note; not recurring
-- Full-date absolute times accept a single-digit hour (`at 2099-10-06 5:00`,
-  `…T5:00:00`) — same as time-only `H:mm`; previously only zero-padded `HH`
-- Big clock shrinks to fit instead of cropping on resize; displayed times
-  (clock, table, notification, `--list`, CLI add) drop the zone suffix —
-  always local
-- Notification dialog: animated ringing clock (`icons/alarm-ringing.svg`,
-  SMIL, played via QSvgRenderer) — hops side to side, rattles its bells,
-  radiates sound waves
-- Minimal input row: drop Add/Edit/Restart/Remove toolbar buttons; keep
-  compact **?** for syntax help (F1). Actions via Enter, shortcuts, double-click,
-  context menu
-- Help button + F1: full alarm time syntax dialog (relative, absolute,
-  glued zones, repeating, notes) with examples; parse-error hint points here
-- Recurring alarms: `every 5m`, `every monday at 18:00`, `daily at 7:30`,
-  weekdays/weekends; re-arm on ack, Skip next (Ctrl+K), DST-safe
-- Fix glued timezone parsing (`at 15:10CEST`)
-- Man page / README: D-Bus + busctl examples
-- Session D-Bus API (`org.alarmqt.AlarmQt` / `/org/alarmqt/AlarmQt`)
-- `--list` reply protocol (secondary prints primary's alarm list)
-- Missed alarms, SNOOZED status, notification blink redesign, row blink
-- Parser unit tests (Qt Test) + American 12-hour coverage
-- Man page, friendly notes, VERSION scheme
-- Resizable/reorderable table columns
+- Relative: combined units (`in 1 year 2 months`, `in 2 weeks 3 days`);
+  synonyms (`half an hour`, `quarter hour`, `an hour`, `fortnight`); years
+- Absolute: `this friday`, `next week` / `next week monday`; `eod` / `end of day`;
+  bare hour `at 17`
+- Recurring: yearly (`every year on 10-06 at 9:00`); Nth weekday of month
+  (`every 2nd tuesday at 18:00`, `every last friday…`); biweekly
+  (`every 2 weeks on monday at 9:00`) via weekStride
+- Monthly day-of-month; today/tomorrow; bare weekday; weeks/months; date+am/pm;
+  noon/midnight; next weekday; unpadded full-date hour
 
 ## Handoff
 
-Apply the latest `alarmqt-036.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-037.*.bundle` from artifacts (cumulative from `071e920`).

@@ -21,6 +21,10 @@ private slots:
     void absolute_date_ampm();
     void absolute_noon_midnight();
     void recurring_monthly();
+    void relative_synonyms_combined();
+    void absolute_this_next_week();
+    void absolute_eod_bare_hour();
+    void recurring_yearly_nth_biweekly();
     void absolute_american_ampm();
     void absolute_glued_timezone();
     void notes_trailing_words();
@@ -253,6 +257,77 @@ void TestParser::recurring_monthly() {
     auto c = AlarmManager::parse(QStringLiteral("each month on the 1st 9am"));
     QVERIFY(c.has_value());
     QCOMPARE(c->recurrence.dayOfMonth, 1);
+    QCOMPARE(c->recurrence.time, QTime(9, 0));
+}
+
+void TestParser::relative_synonyms_combined() {
+    auto a = AlarmManager::parse(QStringLiteral("in half an hour"));
+    QVERIFY(a.has_value());
+    const qint64 s = QDateTime::currentDateTimeUtc().secsTo(a->triggerUtc);
+    QVERIFY2(s >= 28 * 60 && s <= 32 * 60, qPrintable(QString::number(s)));
+
+    auto b = AlarmManager::parse(QStringLiteral("in a fortnight"));
+    QVERIFY(b.has_value());
+    const qint64 sb = QDateTime::currentDateTimeUtc().secsTo(b->triggerUtc);
+    QVERIFY2(sb >= 13 * 86400 && sb <= 15 * 86400, qPrintable(QString::number(sb)));
+
+    auto c = AlarmManager::parse(QStringLiteral("in 1 year 2 months"));
+    QVERIFY(c.has_value());
+    const QDate expect = QDateTime::currentDateTime().date().addYears(1).addMonths(2);
+    QCOMPARE(c->triggerUtc.toLocalTime().date(), expect);
+
+    auto d = AlarmManager::parse(QStringLiteral("in 2 weeks 3 days walk"));
+    QVERIFY(d.has_value());
+    QCOMPARE(d->label, QStringLiteral("walk"));
+}
+
+void TestParser::absolute_this_next_week() {
+    auto a = AlarmManager::parse(QStringLiteral("this friday 18:00"));
+    // May fail if "this friday" already passed this week — still try next monday form
+    auto b = AlarmManager::parse(QStringLiteral("next week monday 9:00"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->triggerUtc.toLocalTime().date().dayOfWeek(), 1);
+    QVERIFY(QDateTime::currentDateTime().daysTo(b->triggerUtc.toLocalTime()) >= 1);
+
+    auto c = AlarmManager::parse(QStringLiteral("next week 10:00"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().date().dayOfWeek(),
+             QDate::currentDate().dayOfWeek());
+}
+
+void TestParser::absolute_eod_bare_hour() {
+    auto a = AlarmManager::parse(QStringLiteral("tomorrow eod"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->triggerUtc.toLocalTime().time(), QTime(23, 59));
+
+    auto b = AlarmManager::parse(QStringLiteral("at 17"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->triggerUtc.toLocalTime().time().hour(), 17);
+    QCOMPARE(b->triggerUtc.toLocalTime().time().minute(), 0);
+
+    auto c = AlarmManager::parse(QStringLiteral("end of day"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().time(), QTime(23, 59));
+}
+
+void TestParser::recurring_yearly_nth_biweekly() {
+    auto a = AlarmManager::parse(QStringLiteral("every year on 10-06 at 9:00"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->recurrence.kind, Recurrence::Kind::Yearly);
+    QCOMPARE(a->recurrence.month, 10);
+    QCOMPARE(a->recurrence.dayOfMonth, 6);
+    QCOMPARE(a->recurrence.time, QTime(9, 0));
+
+    auto b = AlarmManager::parse(QStringLiteral("every 2nd tuesday at 18:00"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->recurrence.kind, Recurrence::Kind::Monthly);
+    QCOMPARE(b->recurrence.weekOrdinal, 2);
+    QCOMPARE(b->recurrence.time, QTime(18, 0));
+
+    auto c = AlarmManager::parse(QStringLiteral("every 2 weeks on monday at 9:00"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->recurrence.kind, Recurrence::Kind::Weekly);
+    QCOMPARE(c->recurrence.weekStride, 2);
     QCOMPARE(c->recurrence.time, QTime(9, 0));
 }
 

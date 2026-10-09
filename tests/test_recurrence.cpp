@@ -23,6 +23,8 @@ private slots:
     void describe();
     void monthly_next_after();
     void monthly_skips_short_months();
+    void yearly_next_after();
+    void nth_weekday_monthly();
     void json_roundtrip();
 
     void parse_weekly();
@@ -175,6 +177,30 @@ void TestRecurrence::monthly_skips_short_months() {
     QCOMPARE(next.toLocalTime().time(), QTime(8, 0));
 }
 
+void TestRecurrence::yearly_next_after() {
+    Recurrence r;
+    r.kind = Recurrence::Kind::Yearly;
+    r.month = 10;
+    r.dayOfMonth = 6;
+    r.time = QTime(9, 0);
+    const QDateTime before = QDateTime(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::systemTimeZone()).toUTC();
+    const QDateTime next = r.nextAfter(before);
+    QCOMPARE(next.toLocalTime().date(), QDate(2026, 10, 6));
+    QCOMPARE(next.toLocalTime().time(), QTime(9, 0));
+}
+
+void TestRecurrence::nth_weekday_monthly() {
+    Recurrence r;
+    r.kind = Recurrence::Kind::Monthly;
+    r.weekOrdinal = 2;
+    r.weekdays = static_cast<quint8>(1 << (Qt::Tuesday - 1));
+    r.time = QTime(18, 0);
+    // 2nd Tuesday of March 2026 is 2026-03-10
+    const QDateTime before = QDateTime(QDate(2026, 3, 1), QTime(0, 0), QTimeZone::systemTimeZone()).toUTC();
+    const QDateTime next = r.nextAfter(before);
+    QCOMPARE(next.toLocalTime().date(), QDate(2026, 3, 10));
+}
+
 void TestRecurrence::json_roundtrip() {
     const Recurrence w = weekly(dayBit(Qt::Friday), QTime(17, 45, 10));
     QCOMPARE(Recurrence::fromJson(w.toJson()), w);
@@ -188,6 +214,12 @@ void TestRecurrence::json_roundtrip() {
     mo.time = QTime(9, 30);
     QCOMPARE(Recurrence::fromJson(mo.toJson()), mo);
     QCOMPARE(mo.describe(), QStringLiteral("monthly 6th 09:30"));
+    Recurrence y;
+    y.kind = Recurrence::Kind::Yearly;
+    y.month = 10;
+    y.dayOfMonth = 6;
+    y.time = QTime(9, 0);
+    QCOMPARE(Recurrence::fromJson(y.toJson()), y);
     QCOMPARE(Recurrence::fromJson(QJsonObject()), Recurrence());
 
     // Through Alarm, and old files with the unused "repeating" flag.

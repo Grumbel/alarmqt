@@ -75,56 +75,93 @@ static qint64 durationSecs(const QRegularExpressionMatch& m, int firstGroup) {
 }
 
 static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
-    // Matches: in 5m, in 2h30m, in 1d 2h, 5 minutes, etc.
-    // Require at least one duration unit; anchor full string.
-    const QString t = s.trimmed();
-    static const QRegularExpression re(
-        QStringLiteral(R"(\A)") + kDurationPattern + QStringLiteral(R"(\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
+    QString t = s.trimmed();
+    // Optional leading "in "
+    if (t.startsWith(QLatin1String("in "), Qt::CaseInsensitive))
+        t = t.mid(3).trimmed();
 
-    const qint64 secs = durationSecs(re.match(t), 1);
+    // Synonyms (whole string after optional "in")
+    static const QRegularExpression halfHour(
+        QStringLiteral(R"(\A(?:a\s+)?half(?:\s+an?)?\s+hours?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (halfHour.match(t).hasMatch())
+        return nowLocal.addSecs(30 * 60);
+
+    static const QRegularExpression quarterHour(
+        QStringLiteral(R"(\A(?:a\s+)?quarters?\s+(?:of\s+an?\s+)?hours?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (quarterHour.match(t).hasMatch())
+        return nowLocal.addSecs(15 * 60);
+
+    static const QRegularExpression anHour(
+        QStringLiteral(R"(\Aan?\s+hours?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (anHour.match(t).hasMatch())
+        return nowLocal.addSecs(3600);
+
+    static const QRegularExpression fortnight(
+        QStringLiteral(R"(\A(?:a\s+)?fortnights?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (fortnight.match(t).hasMatch())
+        return nowLocal.addDays(14);
+
+    // Combined: [N years] [N months] [N weeks] [N days] [d/h/m/s pattern]
+    // Also accepts pure "2 weeks", "1 year 2 months", "2 weeks 3 days", "1h30m".
+    static const QRegularExpression combined(
+        QStringLiteral(
+            R"(\A(?:(\d+)\s*years?)?\s*(?:(\d+)\s*months?)?\s*(?:(\d+)\s*weeks?)?\s*)"
+            R"((?:(\d+)\s*days?)?\s*)") + kDurationUnits + QStringLiteral(R"(\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = combined.match(t); m.hasMatch()) {
+        bool any = false;
+        QDateTime out = nowLocal;
+        auto take = [&](int group, auto apply) {
+            if (m.captured(group).isEmpty())
+                return;
+            bool ok = false;
+            const int n = m.captured(group).toInt(&ok);
+            if (!ok || n <= 0)
+                return;
+            apply(n);
+            any = true;
+        };
+        take(1, [&](int n) {
+            if (n <= 100)
+                out = out.addYears(n);
+        });
+        take(2, [&](int n) {
+            if (n <= 1200)
+                out = out.addMonths(n);
+        });
+        take(3, [&](int n) {
+            if (n <= kMaxRelativeSecs / (7 * 86400))
+                out = out.addDays(n * 7);
+        });
+        take(4, [&](int n) {
+            if (n <= kMaxRelativeSecs / 86400)
+                out = out.addDays(n);
+        });
+        // groups 5–8 = d/h/m/s from kDurationUnits (may double-count "days" if
+        // both "3 days" and "3d" — prefer the word form above; units start at 5)
+        const qint64 unitSecs = durationSecs(m, 5);
+        if (unitSecs > 0) {
+            out = out.addSecs(unitSecs);
+            any = true;
+        }
+        if (any)
+            return out;
+    }
+
+    // Fallback: classic d/h/m/s only with optional "in" already stripped
+    static const QRegularExpression unitsOnly(
+        QStringLiteral(R"(\A)") + kDurationUnits + QStringLiteral(R"(\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    const qint64 secs = durationSecs(unitsOnly.match(t), 1);
     if (secs > 0)
         return nowLocal.addSecs(secs);
 
-    // in 2 weeks / 1 week  (fixed 7-day weeks)
-    static const QRegularExpression weeksRe(
-        QStringLiteral(R"(\A(?:in\s+)?(\d+)\s*weeks?\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
-    if (const auto wm = weeksRe.match(t); wm.hasMatch()) {
-        bool ok = false;
-        const qint64 n = wm.captured(1).toLongLong(&ok);
-        if (!ok || n <= 0 || n > kMaxRelativeSecs / (7 * 86400))
-            return {};
-        return nowLocal.addDays(n * 7);
-    }
-
-    // in 2 months — calendar months (length varies)
-    static const QRegularExpression monthsRe(
-        QStringLiteral(R"(\A(?:in\s+)?(\d+)\s*months?\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
-    if (const auto mm = monthsRe.match(t); mm.hasMatch()) {
-        bool ok = false;
-        const int n = mm.captured(1).toInt(&ok);
-        if (!ok || n <= 0 || n > 1200)
-            return {};
-        return nowLocal.addMonths(n);
-    }
-
-    // in 3 years — calendar years
-    static const QRegularExpression yearsRe(
-        QStringLiteral(R"(\A(?:in\s+)?(\d+)\s*years?\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
-    if (const auto ym = yearsRe.match(t); ym.hasMatch()) {
-        bool ok = false;
-        const int n = ym.captured(1).toInt(&ok);
-        if (!ok || n <= 0 || n > 100)
-            return {};
-        return nowLocal.addYears(n);
-    }
-
     return {};
 }
-
 
 // Glued timezone on absolute times only: "15:10CEST", "15:10+02:00", "12:00Z".
 // A space before a word starts a label, not a zone ("15:10 standup").
@@ -210,6 +247,18 @@ static QTime parseTimeOfDay(const QString& text) {
         return QTime(12, 0);
     if (t.compare(QLatin1String("midnight"), Qt::CaseInsensitive) == 0)
         return QTime(0, 0);
+    if (t.compare(QLatin1String("eod"), Qt::CaseInsensitive) == 0
+        || t.compare(QLatin1String("end of day"), Qt::CaseInsensitive) == 0)
+        return QTime(23, 59);
+
+    // Bare hour: "5" or "17" (callers require leading "at" to disambiguate)
+    static const QRegularExpression bareHour(QStringLiteral(R"(\A(\d{1,2})\z)"));
+    if (const auto bh = bareHour.match(t); bh.hasMatch()) {
+        const int hour = bh.captured(1).toInt();
+        if (hour >= 0 && hour <= 23)
+            return QTime(hour, 0);
+        return {};
+    }
 
     QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
     if (!time.isValid())
@@ -327,7 +376,7 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
         R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
         R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
     static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight)(?![\w:]))");
+        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
 
     static const QRegularExpression weeklyRe(
         QStringLiteral(R"(\A(?:(?:every|each)\s+()") + kDay
@@ -342,6 +391,78 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
         QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression daySplitRe(
         QStringLiteral(R"(\s*(?:,|/|&|\band\b)\s*)"), QRegularExpression::CaseInsensitiveOption);
+
+    // every 2 weeks on monday at 9:00
+    static const QRegularExpression biweeklyRe(
+        QStringLiteral(R"(\A(?:every|each)\s+(\d+)\s+weeks?\s+on\s+()") + kDay
+            + QStringLiteral(R"()\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = biweeklyRe.match(input); m.hasMatch()) {
+        const int stride = m.captured(1).toInt();
+        const QTime time = parseTimeOfDay(m.captured(3));
+        const quint8 mask = dayTokenMask(m.captured(2).trimmed());
+        if (stride < 1 || stride > 12 || !time.isValid() || mask == 0)
+            return false;
+        rec->kind = Recurrence::Kind::Weekly;
+        rec->time = time;
+        rec->weekdays = mask;
+        rec->weekStride = stride;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
+
+    // every 2nd tuesday at 18:00 / every last friday at 9:00
+    static const QRegularExpression nthWeekdayRe(
+        QStringLiteral(R"(\A(?:every|each)\s+(1st|2nd|3rd|4th|5th|first|second|third|fourth|fifth|last)\s+()") + kDay
+            + QStringLiteral(R"()\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = nthWeekdayRe.match(input); m.hasMatch()) {
+        QString ord = m.captured(1).toLower();
+        int weekOrd = 0;
+        if (ord == QLatin1String("last"))
+            weekOrd = -1;
+        else if (ord.startsWith(QLatin1String("1")) || ord.startsWith(QLatin1String("first")))
+            weekOrd = 1;
+        else if (ord.startsWith(QLatin1String("2")) || ord.startsWith(QLatin1String("second")))
+            weekOrd = 2;
+        else if (ord.startsWith(QLatin1String("3")) || ord.startsWith(QLatin1String("third")))
+            weekOrd = 3;
+        else if (ord.startsWith(QLatin1String("4")) || ord.startsWith(QLatin1String("fourth")))
+            weekOrd = 4;
+        else if (ord.startsWith(QLatin1String("5")) || ord.startsWith(QLatin1String("fifth")))
+            weekOrd = 5;
+        const QTime time = parseTimeOfDay(m.captured(3));
+        const quint8 mask = dayTokenMask(m.captured(2).trimmed());
+        if (weekOrd == 0 || !time.isValid() || mask == 0)
+            return false;
+        rec->kind = Recurrence::Kind::Monthly;
+        rec->time = time;
+        rec->weekOrdinal = weekOrd;
+        rec->weekdays = mask;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
+
+    // every year on 10-06 at 9:00 / yearly on 10-06 at 9:00
+    static const QRegularExpression yearlyRe(
+        QStringLiteral(R"(\A(?:(?:every|each)\s+year|yearly)\s+(?:on\s+)?(\d{1,2})-(\d{1,2})\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = yearlyRe.match(input); m.hasMatch()) {
+        const int month = m.captured(1).toInt();
+        const int day = m.captured(2).toInt();
+        const QTime time = parseTimeOfDay(m.captured(3));
+        if (month < 1 || month > 12 || day < 1 || day > 31 || !time.isValid())
+            return false;
+        rec->kind = Recurrence::Kind::Yearly;
+        rec->month = month;
+        rec->dayOfMonth = day;
+        rec->time = time;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
 
     // every month on the 6th at 9:00 / monthly on 15 at 18:00 / each month on the 1st 9am
     static const QRegularExpression monthlyRe(
@@ -413,7 +534,7 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
 static bool parseTodayTomorrow(const QString& input, QString* timePart, QString* note,
                                QDateTime* triggerLocal, const QDateTime& nowLocal) {
     static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight)(?![\w:]))");
+        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
     static const QRegularExpression re(
         QStringLiteral(R"(\A(today|tomorrow)\s*,?\s*(?:at\s+)?)") + kTime,
         QRegularExpression::CaseInsensitiveOption);
@@ -442,12 +563,9 @@ static bool parseTodayTomorrow(const QString& input, QString* timePart, QString*
 }
 
 /**
- * One-shot "<weekday> [at] <time>" / "next <weekday> [at] <time>" — not recurring.
- *   next monday 5:50pm
- *   monday 9:00
- *   mon at 17:50 laundry
- * Uses the same local-wall-clock / DST rules as weekly recurrence: the next
- * matching weekday at that time that is strictly after now.
+ * One-shot weekday forms — not recurring.
+ *   monday 9:00 / next monday 5:50pm / this friday 18:00
+ *   next week 9:00 / next week monday 9:00
  */
 static bool parseNextWeekday(const QString& input, QString* timePart, QString* note,
                              QDateTime* triggerLocal, const QDateTime& nowLocal) {
@@ -455,39 +573,82 @@ static bool parseNextWeekday(const QString& input, QString* timePart, QString* n
         R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
         R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
     static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight)(?![\w:]))");
+        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
+    const QTimeZone zone = nowLocal.timeZone();
 
-    // Optional leading "next "; bare "monday 9:00" means the same as "next monday 9:00".
-    static const QRegularExpression nextRe(
-        QStringLiteral(R"(\A(?:next\s+)?()") + kDay
+    // next week <weekday> [at] <time>
+    static const QRegularExpression nextWeekDayRe(
+        QStringLiteral(R"(\Anext\s+week\s+()") + kDay
             + QStringLiteral(R"()\s*,?\s*(?:at\s+)?)") + kTime,
         QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = nextWeekDayRe.match(input); m.hasMatch()) {
+        const QTime time = parseTimeOfDay(m.captured(2));
+        const quint8 mask = dayTokenMask(m.captured(1).trimmed());
+        if (!time.isValid() || mask == 0)
+            return false;
+        Recurrence probe;
+        probe.kind = Recurrence::Kind::Weekly;
+        probe.time = time;
+        probe.weekdays = mask;
+        const QDateTime utc = probe.nextAfter(nowLocal.addDays(7).toUTC().addSecs(-1), zone);
+        if (!utc.isValid())
+            return false;
+        *triggerLocal = utc.toTimeZone(zone);
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
 
-    const auto m = nextRe.match(input);
-    if (!m.hasMatch())
-        return false;
+    // next week [at] <time> — same weekday next week
+    static const QRegularExpression nextWeekTimeRe(
+        QStringLiteral(R"(\Anext\s+week\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = nextWeekTimeRe.match(input); m.hasMatch()) {
+        const QTime time = parseTimeOfDay(m.captured(1));
+        if (!time.isValid())
+            return false;
+        const quint8 mask = static_cast<quint8>(1 << (nowLocal.date().dayOfWeek() - 1));
+        Recurrence probe;
+        probe.kind = Recurrence::Kind::Weekly;
+        probe.time = time;
+        probe.weekdays = mask;
+        const QDateTime utc = probe.nextAfter(nowLocal.addDays(7).toUTC().addSecs(-1), zone);
+        if (!utc.isValid())
+            return false;
+        *triggerLocal = utc.toTimeZone(zone);
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
 
-    const QTime time = parseTimeOfDay(m.captured(2));
-    if (!time.isValid())
-        return false;
+    // [this|next] <weekday> [at] <time>  (next optional)
+    static const QRegularExpression dayRe(
+        QStringLiteral(R"(\A(?:(this|next)\s+)?()") + kDay
+            + QStringLiteral(R"()\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = dayRe.match(input); m.hasMatch()) {
+        const QTime time = parseTimeOfDay(m.captured(3));
+        const quint8 mask = dayTokenMask(m.captured(2).trimmed());
+        if (!time.isValid() || mask == 0)
+            return false;
+        Recurrence probe;
+        probe.kind = Recurrence::Kind::Weekly;
+        probe.time = time;
+        probe.weekdays = mask;
+        const QDateTime utc = probe.nextAfter(nowLocal.toUTC(), zone);
+        if (!utc.isValid())
+            return false;
+        if (m.captured(1).compare(QLatin1String("this"), Qt::CaseInsensitive) == 0) {
+            if (nowLocal.daysTo(utc.toTimeZone(zone)) > 6)
+                return false;
+        }
+        *triggerLocal = utc.toTimeZone(zone);
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
 
-    const quint8 mask = dayTokenMask(m.captured(1).trimmed());
-    if (mask == 0)
-        return false;
-
-    Recurrence probe;
-    probe.kind = Recurrence::Kind::Weekly;
-    probe.time = time;
-    probe.weekdays = mask;
-    const QTimeZone zone = nowLocal.timeZone();
-    const QDateTime utc = probe.nextAfter(nowLocal.toUTC(), zone);
-    if (!utc.isValid())
-        return false;
-
-    *triggerLocal = utc.toTimeZone(zone);
-    *timePart = m.captured(0).trimmed();
-    *note = cleanNote(input.mid(m.capturedLength(0)));
-    return true;
+    return false;
 }
 
 // Split "time expression" + optional human note.
@@ -541,12 +702,25 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
         }
     }
     static const QRegularExpression weekMonthYearPrefix(
-        QStringLiteral(R"(\A((?:in\s+)?\d+\s*(?:weeks?|months?|years?))\b)"),
+        QStringLiteral(
+            R"(\A((?:in\s+)?(?:\d+\s*(?:years?|months?|weeks?|days?)\s*)+|(?:in\s+)?\d+\s*(?:weeks?|months?|years?))\b)"),
         QRegularExpression::CaseInsensitiveOption);
     if (auto wm = weekMonthYearPrefix.match(trimmed); wm.hasMatch()) {
         const QString rest = trimmed.mid(wm.capturedLength(0)).trimmed();
         if (!rest.isEmpty()) {
             *timePart = wm.captured(1).trimmed();
+            *note = rest;
+            return;
+        }
+    }
+    static const QRegularExpression synonymPrefix(
+        QStringLiteral(
+            R"(\A((?:in\s+)?(?:(?:a\s+)?half(?:\s+an?)?\s+hours?|(?:a\s+)?quarters?\s+(?:of\s+an?\s+)?hours?|an?\s+hours?|(?:a\s+)?fortnights?))\b)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (auto sp = synonymPrefix.match(trimmed); sp.hasMatch()) {
+        const QString rest = trimmed.mid(sp.capturedLength(0)).trimmed();
+        if (!rest.isEmpty()) {
+            *timePart = sp.captured(1).trimmed();
             *note = rest;
             return;
         }
@@ -593,7 +767,7 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     } else {
         splitTimeAndNote(trimmed, &timePart, &note);
         if (timePart.contains(QRegularExpression(
-                R"(\bin\b|\d+\s*(?:[dhms]|weeks?|months?|years?))",
+                R"(\bin\b|\d+\s*(?:[dhms]|weeks?|months?|years?|days?)|half|quarter|fortnight)",
                 QRegularExpression::CaseInsensitiveOption))) {
             // Prefer relative if it looks like one
             triggerLocal = parseRelative(timePart, nowLocal);
