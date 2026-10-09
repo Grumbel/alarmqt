@@ -102,6 +102,19 @@ void TestParser::absolute_full_date() {
     QCOMPARE(local.date(), QDate(2099, 6, 15));
     QCOMPARE(local.time().hour(), 9);
     QCOMPARE(local.time().minute(), 30);
+
+    // Unpadded hour (same as time-only "H:mm"); help examples use padded form.
+    auto b = AlarmManager::parse(QStringLiteral("at 2099-10-06 5:00"));
+    QVERIFY(b.has_value());
+    const QDateTime localB = b->triggerUtc.toLocalTime();
+    QCOMPARE(localB.date(), QDate(2099, 10, 6));
+    QCOMPARE(localB.time().hour(), 5);
+    QCOMPARE(localB.time().minute(), 0);
+
+    auto c = AlarmManager::parse(QStringLiteral("at 2099-10-06T5:00:00"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().date(), QDate(2099, 10, 6));
+    QCOMPARE(c->triggerUtc.toLocalTime().time().hour(), 5);
 }
 
 void TestParser::absolute_american_ampm() {

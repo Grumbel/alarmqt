@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** clock text fits on resize; no time zone in displayed times
-- **Next bundle NNN:** 031
+- **Current tip:** parse full dates with unpadded hour (`at 2026-10-06 5:00`)
+- **Next bundle NNN:** 032
 
 ## Status
 
@@ -20,6 +20,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Full-date absolute times accept a single-digit hour (`at 2099-10-06 5:00`,
+  `…T5:00:00`) — same as time-only `H:mm`; previously only zero-padded `HH`
 - Big clock shrinks to fit instead of cropping on resize; displayed times
   (clock, table, notification, `--list`, CLI add) drop the zone suffix —
   always local
@@ -44,4 +46,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-030.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-031.*.bundle` from artifacts (cumulative from `071e920`).

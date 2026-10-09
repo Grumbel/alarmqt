@@ -225,13 +225,22 @@ static QDateTime parseAbsolute(const QString& s, const QDateTime& nowLocal) {
     };
 
     // Full ISO-ish: 2026-10-02 15:10 or 2026-10-02T15:10:00
-    dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-dd HH:mm:ss"));
-    if (!dt.isValid())
-        dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-dd HH:mm"));
-    if (!dt.isValid())
-        dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-ddTHH:mm:ss"));
-    if (!dt.isValid())
-        dt = QDateTime::fromString(t, QStringLiteral("yyyy-MM-ddTHH:mm"));
+    // HH requires a zero-padded hour; also accept H for "5:00".
+    static const char* const kDateTimeFmts[] = {
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm",
+        "yyyy-MM-dd H:mm:ss",
+        "yyyy-MM-dd H:mm",
+        "yyyy-MM-ddTHH:mm:ss",
+        "yyyy-MM-ddTHH:mm",
+        "yyyy-MM-ddTH:mm:ss",
+        "yyyy-MM-ddTH:mm",
+    };
+    for (const char* fmt : kDateTimeFmts) {
+        dt = QDateTime::fromString(t, QString::fromUtf8(fmt));
+        if (dt.isValid())
+            break;
+    }
     if (dt.isValid()) {
         // fromString yields local/no zone; pin the intended zone.
         dt.setTimeZone(zone);
