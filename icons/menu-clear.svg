@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="br" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d4a574"/>
+      <stop offset="100%" stop-color="#8b5a2b"/>
+    </linearGradient>
+    <linearGradient id="hd" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7ddea0"/>
+      <stop offset="100%" stop-color="#2f9e5a"/>
+    </linearGradient>
+  </defs>
+  <!-- broom handle -->
+  <rect x="20" y="4" width="3.5" height="18" rx="1.5" fill="url(#br)" stroke="#5c3a18" stroke-width="0.8" transform="rotate(25 22 13)"/>
+  <!-- bristles -->
+  <path d="M8 22 L14 18 L18 24 L12 28 Z" fill="#c9a227" stroke="#8a7010" stroke-width="0.9"/>
+  <path d="M9 23 L13 20 M11 25 L15 22 M10 26 L14 23" stroke="#6b5510" stroke-width="0.7"/>
+  <!-- check badge -->
+  <circle cx="10" cy="10" r="7" fill="url(#hd)" stroke="#1f6b3a" stroke-width="1.2"/>
+  <path d="M6.5 10 L9 12.5 L13.5 7.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

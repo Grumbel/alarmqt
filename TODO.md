@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** main menu + disable/enable alarms
-- **Next bundle NNN:** 039
+- **Current tip:** colorful SVG icons on all menu entries
+- **Next bundle NNN:** 040
 
 ## Status
 
@@ -19,6 +19,7 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Classic colorful SVG icons on main menu, context menu, and tray menu
 - Main menu bar (File / Alarm / Help) with standard actions and About
 - Disable / Enable alarms (right-click, Alarm menu, Ctrl+P): paused state
   never fires; status DISABLED; gray row; persists in JSON; restart clears it
@@ -34,4 +35,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-038.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-039.*.bundle` from artifacts (cumulative from `071e920`).

@@ -36,6 +36,10 @@
 
 namespace {
 constexpr int kColStatus = 0;
+
+QIcon menuIcon(const char* name) {
+    return QIcon(QStringLiteral(":/icons/%1").arg(QLatin1String(name)));
+}
 constexpr int kColRemaining = 1;
 constexpr int kColWhen = 2;
 constexpr int kColCommand = 3;
@@ -241,34 +245,61 @@ void MainWindow::updateClock() {
 
 void MainWindow::createMenus() {
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("&Quit"), qApp, []() { QApplication::exit(0); },
-                        QKeySequence::Quit);
+    {
+        auto* a = fileMenu->addAction(menuIcon("menu-quit.svg"), tr("&Quit"),
+                                      qApp, []() { QApplication::exit(0); });
+        a->setShortcut(QKeySequence::Quit);
+    }
 
     auto* alarmMenu = menuBar()->addMenu(tr("&Alarm"));
-    alarmMenu->addAction(tr("&Add alarm…"), this, [this]() {
-        m_input->setFocus();
-        m_input->selectAll();
-    }, QKeySequence::New);
-    alarmMenu->addAction(tr("&Edit…"), this, &MainWindow::editSelected,
-                         QKeySequence(Qt::CTRL | Qt::Key_E));
-    alarmMenu->addAction(tr("&Restart"), this, &MainWindow::restartSelected,
-                         QKeySequence(Qt::CTRL | Qt::Key_R));
-    alarmMenu->addAction(tr("Skip next"), this, &MainWindow::skipSelected,
-                         QKeySequence(Qt::CTRL | Qt::Key_K));
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-add.svg"), tr("&Add alarm…"), this, [this]() {
+            m_input->setFocus();
+            m_input->selectAll();
+        });
+        a->setShortcut(QKeySequence::New);
+    }
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-edit.svg"), tr("&Edit…"),
+                                       this, &MainWindow::editSelected);
+        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    }
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-restart.svg"), tr("&Restart"),
+                                       this, &MainWindow::restartSelected);
+        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
+    }
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-skip.svg"), tr("Skip next"),
+                                       this, &MainWindow::skipSelected);
+        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
+    }
     alarmMenu->addSeparator();
-    alarmMenu->addAction(tr("&Disable"), this, &MainWindow::disableSelected,
-                         QKeySequence(Qt::CTRL | Qt::Key_P));
-    alarmMenu->addAction(tr("E&nable"), this, &MainWindow::enableSelected);
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-disable.svg"), tr("&Disable"),
+                                       this, &MainWindow::disableSelected);
+        a->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
+    }
+    alarmMenu->addAction(menuIcon("menu-enable.svg"), tr("E&nable"),
+                         this, &MainWindow::enableSelected);
     alarmMenu->addSeparator();
-    alarmMenu->addAction(tr("&Remove"), this, &MainWindow::removeSelected,
-                         QKeySequence::Delete);
-    alarmMenu->addAction(tr("Clear &DONE alarms"), this, &MainWindow::clearDoneAlarms);
+    {
+        auto* a = alarmMenu->addAction(menuIcon("menu-remove.svg"), tr("&Remove"),
+                                       this, &MainWindow::removeSelected);
+        a->setShortcut(QKeySequence::Delete);
+    }
+    alarmMenu->addAction(menuIcon("menu-clear.svg"), tr("Clear &DONE alarms"),
+                         this, &MainWindow::clearDoneAlarms);
 
     auto* helpMenu = menuBar()->addMenu(tr("&Help"));
-    helpMenu->addAction(tr("Alarm time &syntax…"), this, &MainWindow::showSyntaxHelp,
-                        QKeySequence::HelpContents);
+    {
+        auto* a = helpMenu->addAction(menuIcon("menu-help.svg"), tr("Alarm time &syntax…"),
+                                      this, &MainWindow::showSyntaxHelp);
+        a->setShortcut(QKeySequence::HelpContents);
+    }
     helpMenu->addSeparator();
-    helpMenu->addAction(tr("&About AlarmQt"), this, &MainWindow::showAbout);
+    helpMenu->addAction(menuIcon("menu-about.svg"), tr("&About AlarmQt"),
+                        this, &MainWindow::showAbout);
 }
 
 void MainWindow::disableSelected() {
@@ -330,21 +361,22 @@ void MainWindow::createTray() {
     m_tray->setToolTip(tr("AlarmQt"));
 
     auto* menu = new QMenu(this);
-    menu->addAction(tr("Show / Hide"), this, [this]() {
+    menu->addAction(menuIcon("menu-show.svg"), tr("Show / Hide"), this, [this]() {
         if (isVisible())
             hide();
         else
             raiseAndActivate();
     });
-    menu->addAction(tr("Add alarm…"), this, [this]() {
+    menu->addAction(menuIcon("menu-add.svg"), tr("Add alarm…"), this, [this]() {
         raiseAndActivate();
         m_input->setFocus();
     });
-    menu->addAction(tr("Clear DONE alarms"), this, &MainWindow::clearDoneAlarms);
+    menu->addAction(menuIcon("menu-clear.svg"), tr("Clear DONE alarms"),
+                    this, &MainWindow::clearDoneAlarms);
     menu->addSeparator();
     // exit() rather than quit(): quit() first sends close events, which the
     // notification dialogs would treat as "snooze".
-    menu->addAction(tr("Quit"), qApp, []() { QApplication::exit(0); });
+    menu->addAction(menuIcon("menu-quit.svg"), tr("Quit"), qApp, []() { QApplication::exit(0); });
     m_tray->setContextMenu(menu);
 
     connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::onTrayActivated);
@@ -626,8 +658,8 @@ void MainWindow::onTableContextMenu(const QPoint& pos) {
         m_table->selectRow(index.row());
 
     QMenu menu(this);
-    menu.addAction(tr("Edit…"), this, &MainWindow::editSelected);
-    menu.addAction(tr("Restart"), this, &MainWindow::restartSelected);
+    menu.addAction(menuIcon("menu-edit.svg"), tr("Edit…"), this, &MainWindow::editSelected);
+    menu.addAction(menuIcon("menu-restart.svg"), tr("Restart"), this, &MainWindow::restartSelected);
     bool anyRecurring = false;
     bool anyDisableable = false;
     bool anyDisabled = false;
@@ -643,12 +675,15 @@ void MainWindow::onTableContextMenu(const QPoint& pos) {
                 }
             }
     }
-    menu.addAction(tr("Skip next"), this, &MainWindow::skipSelected)->setEnabled(anyRecurring);
-    menu.addAction(tr("Disable"), this, &MainWindow::disableSelected)->setEnabled(anyDisableable);
-    menu.addAction(tr("Enable"), this, &MainWindow::enableSelected)->setEnabled(anyDisabled);
+    menu.addAction(menuIcon("menu-skip.svg"), tr("Skip next"), this, &MainWindow::skipSelected)
+        ->setEnabled(anyRecurring);
+    menu.addAction(menuIcon("menu-disable.svg"), tr("Disable"), this, &MainWindow::disableSelected)
+        ->setEnabled(anyDisableable);
+    menu.addAction(menuIcon("menu-enable.svg"), tr("Enable"), this, &MainWindow::enableSelected)
+        ->setEnabled(anyDisabled);
     menu.addSeparator();
-    menu.addAction(tr("Remove"), this, &MainWindow::removeSelected);
-    menu.addAction(tr("Clear all DONE"), this, &MainWindow::clearDoneAlarms);
+    menu.addAction(menuIcon("menu-remove.svg"), tr("Remove"), this, &MainWindow::removeSelected);
+    menu.addAction(menuIcon("menu-clear.svg"), tr("Clear all DONE"), this, &MainWindow::clearDoneAlarms);
     menu.exec(m_table->viewport()->mapToGlobal(pos));
 }
 

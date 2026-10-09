@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd56b"/>
+      <stop offset="100%" stop-color="#e09a20"/>
+    </linearGradient>
+    <linearGradient id="lead" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6b7c93"/>
+      <stop offset="100%" stop-color="#3d4a5c"/>
+    </linearGradient>
+  </defs>
+  <path d="M6 26 L8 18 L24 4 L28 8 L12 24 Z" fill="url(#wood)" stroke="#a86b10" stroke-width="1.2"/>
+  <path d="M24 4 L28 8 L26 10 L22 6 Z" fill="#c0392b" stroke="#8b1e14" stroke-width="0.8"/>
+  <path d="M6 26 L8 18 L10 20 Z" fill="url(#lead)"/>
+  <path d="M12 24 L10 20 L8 18" fill="none" stroke="#8b6914" stroke-width="0.8"/>
+</svg>

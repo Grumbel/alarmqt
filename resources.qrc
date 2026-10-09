@@ -3,6 +3,18 @@
   <qresource prefix="/">
     <file>icons/alarm.svg</file>
     <file>icons/alarm-ringing.svg</file>
+    <file>icons/menu-add.svg</file>
+    <file>icons/menu-edit.svg</file>
+    <file>icons/menu-restart.svg</file>
+    <file>icons/menu-skip.svg</file>
+    <file>icons/menu-disable.svg</file>
+    <file>icons/menu-enable.svg</file>
+    <file>icons/menu-remove.svg</file>
+    <file>icons/menu-clear.svg</file>
+    <file>icons/menu-quit.svg</file>
+    <file>icons/menu-help.svg</file>
+    <file>icons/menu-about.svg</file>
+    <file>icons/menu-show.svg</file>
     <file>sounds/alarm.wav</file>
   </qresource>
 </RCC>
