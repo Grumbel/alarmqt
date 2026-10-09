@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** platform Cancel/Ok button order
-- **Next bundle NNN:** 043
+- **Current tip:** fix fullscreen ringing clock aspect ratio
+- **Next bundle NNN:** 044
 
 ## Status
 
@@ -17,6 +17,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Fullscreen notification keeps the ringing-clock SVG aspect ratio (no
+  stretch to square)
 - Dialog buttons use Qt standard roles so Cancel/Ok (and Cancel/Delete)
   follow the platform order (GNOME Cancel then action; Windows may reverse)
 - Interval auto-roll: unanswered `every Nm` notification closes when the
@@ -44,4 +46,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-042.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-043.*.bundle` from artifacts (cumulative from `071e920`).

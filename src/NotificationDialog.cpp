@@ -30,11 +30,16 @@ const char* kFullscreenBlack =
 
 class RingingClock : public QWidget {
 public:
-    explicit RingingClock(QWidget* parent = nullptr)
+    // scale multiplies the SVG's native size (176×156); never force a square.
+    explicit RingingClock(qreal scale = 0.75, QWidget* parent = nullptr)
         : QWidget(parent)
         , m_renderer(QStringLiteral(":/icons/alarm-ringing.svg"), this)
     {
-        setFixedSize(m_renderer.defaultSize() * 3 / 4);
+        QSize native = m_renderer.defaultSize();
+        if (!native.isValid() || native.isEmpty())
+            native = QSize(176, 156); // matches icons/alarm-ringing.svg
+        setFixedSize(QSize(qRound(native.width() * scale),
+                           qRound(native.height() * scale)));
         connect(&m_renderer, &QSvgRenderer::repaintNeeded, this, qOverload<>(&QWidget::update));
     }
 
@@ -42,7 +47,14 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        m_renderer.render(&p, rect());
+        // Letterbox: keep the SVG aspect ratio even if the widget size drifts.
+        QSizeF native = m_renderer.defaultSize();
+        if (!native.isValid() || native.isEmpty())
+            native = QSizeF(176, 156);
+        QRectF target(QPointF(), native);
+        target.setSize(target.size().scaled(QSizeF(rect().size()), Qt::KeepAspectRatio));
+        target.moveCenter(QRectF(rect()).center());
+        m_renderer.render(&p, target);
     }
 
 private:
@@ -94,11 +106,8 @@ QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** when
     subtitle->setWordWrap(true);
 
     centerLayout->addStretch(1);
-    auto* clock = new RingingClock;
-    if (large) {
-        const QSize base = clock->sizeHint().isEmpty() ? QSize(96, 96) : clock->sizeHint();
-        clock->setFixedSize(base * 3 / 2);
-    }
+    // Fullscreen uses a larger scale; aspect ratio always follows the SVG (176×156).
+    auto* clock = new RingingClock(large ? 1.5 : 0.75);
     centerLayout->addWidget(clock, 0, Qt::AlignHCenter);
     centerLayout->addWidget(title);
     centerLayout->addWidget(when);
