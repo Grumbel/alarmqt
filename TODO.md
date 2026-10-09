@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** parser extensions — combined relative, synonyms, this/next week, yearly, nth weekday, biweekly, eod, bare hour
-- **Next bundle NNN:** 038
+- **Current tip:** main menu + disable/enable alarms
+- **Next bundle NNN:** 039
 
 ## Status
 
@@ -13,13 +13,15 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 ## Open
 
 - [ ] Recurring alarms, follow-ups: auto-close an unanswered interval
-      notification when the next one is due; pause/resume; `until` / count
-      limits
+      notification when the next one is due; `until` / count limits
 - [ ] Mute / volume for notification sound
 - [ ] Shell completions (bash/zsh/fish)
 
 ## Done recently
 
+- Main menu bar (File / Alarm / Help) with standard actions and About
+- Disable / Enable alarms (right-click, Alarm menu, Ctrl+P): paused state
+  never fires; status DISABLED; gray row; persists in JSON; restart clears it
 - Relative: combined units (`in 1 year 2 months`, `in 2 weeks 3 days`);
   synonyms (`half an hour`, `quarter hour`, `an hour`, `fortnight`); years
 - Absolute: `this friday`, `next week` / `next week monday`; `eod` / `end of day`;
@@ -32,4 +34,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-037.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-038.*.bundle` from artifacts (cumulative from `071e920`).

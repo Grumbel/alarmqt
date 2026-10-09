@@ -42,14 +42,18 @@ private slots:
     void restartSelected();
     void skipSelected();
     void clearDoneAlarms();
+    void disableSelected();
+    void enableSelected();
     void onRowDoubleClicked(int row, int column);
     void onTableContextMenu(const QPoint& pos);
     void updateTray();
     void renotifyTriggered();
     void showSyntaxHelp();
+    void showAbout();
 
 private:
     void createTray();
+    void createMenus();
     void showNotification(const Alarm& a);
     bool editAlarm(const QUuid& id);
 

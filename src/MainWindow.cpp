@@ -15,6 +15,7 @@
 #include <QItemSelection>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -44,6 +45,8 @@ constexpr int kRoleId = Qt::UserRole;
 QColor rowBackground(const Alarm& a) {
     if (a.acknowledged)
         return QColor(0x68, 0xd3, 0x91, 0x40); // soft green DONE
+    if (a.disabled)
+        return QColor(0x71, 0x80, 0x96, 0x40); // muted gray DISABLED
     if (a.missed)
         return QColor(0x9b, 0x2c, 0x2c, 0x55); // deep red MISSED
     if (a.triggered)
@@ -185,16 +188,9 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     statusBar()->addPermanentWidget(m_status, 1);
     statusBar()->setSizeGripEnabled(true);
 
-    new QShortcut(QKeySequence::New, this, [this]() {
-        m_input->setFocus();
-        m_input->selectAll();
-    });
-    new QShortcut(QKeySequence::Delete, this, [this]() { removeSelected(); });
+    // Menu bar actions own the primary shortcuts (New, Edit, Restart, Skip,
+    // Disable, Remove, Help). Keep only extras that are not on the menu.
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this, [this]() { removeSelected(); });
-    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), this, [this]() { editSelected(); });
-    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_R), this, [this]() { restartSelected(); });
-    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_K), this, [this]() { skipSelected(); });
-    new QShortcut(QKeySequence::HelpContents, this, [this]() { showSyntaxHelp(); });
     new QShortcut(QKeySequence(Qt::Key_Escape), this, [this]() { hide(); });
 
     connect(m_manager, &AlarmManager::alarmsChanged, this, &MainWindow::refreshList);
@@ -224,6 +220,7 @@ MainWindow::MainWindow(AlarmManager* manager, QWidget* parent)
     });
     m_rowBlinkTimer.start();
 
+    createMenus();
     createTray();
     refreshList();
     m_input->setFocus();
@@ -242,7 +239,92 @@ void MainWindow::updateClock() {
     m_clock->setClockText(now.toString(QStringLiteral("dddd  yyyy-MM-dd  HH:mm:ss")));
 }
 
+void MainWindow::createMenus() {
+    auto* fileMenu = menuBar()->addMenu(tr("&File"));
+    fileMenu->addAction(tr("&Quit"), qApp, []() { QApplication::exit(0); },
+                        QKeySequence::Quit);
+
+    auto* alarmMenu = menuBar()->addMenu(tr("&Alarm"));
+    alarmMenu->addAction(tr("&Add alarm…"), this, [this]() {
+        m_input->setFocus();
+        m_input->selectAll();
+    }, QKeySequence::New);
+    alarmMenu->addAction(tr("&Edit…"), this, &MainWindow::editSelected,
+                         QKeySequence(Qt::CTRL | Qt::Key_E));
+    alarmMenu->addAction(tr("&Restart"), this, &MainWindow::restartSelected,
+                         QKeySequence(Qt::CTRL | Qt::Key_R));
+    alarmMenu->addAction(tr("Skip next"), this, &MainWindow::skipSelected,
+                         QKeySequence(Qt::CTRL | Qt::Key_K));
+    alarmMenu->addSeparator();
+    alarmMenu->addAction(tr("&Disable"), this, &MainWindow::disableSelected,
+                         QKeySequence(Qt::CTRL | Qt::Key_P));
+    alarmMenu->addAction(tr("E&nable"), this, &MainWindow::enableSelected);
+    alarmMenu->addSeparator();
+    alarmMenu->addAction(tr("&Remove"), this, &MainWindow::removeSelected,
+                         QKeySequence::Delete);
+    alarmMenu->addAction(tr("Clear &DONE alarms"), this, &MainWindow::clearDoneAlarms);
+
+    auto* helpMenu = menuBar()->addMenu(tr("&Help"));
+    helpMenu->addAction(tr("Alarm time &syntax…"), this, &MainWindow::showSyntaxHelp,
+                        QKeySequence::HelpContents);
+    helpMenu->addSeparator();
+    helpMenu->addAction(tr("&About AlarmQt"), this, &MainWindow::showAbout);
+}
+
+void MainWindow::disableSelected() {
+    const auto rows = m_table->selectionModel()->selectedRows();
+    if (rows.isEmpty()) {
+        QMessageBox::information(this, tr("Disable"), tr("Select an alarm to disable."));
+        return;
+    }
+    int n = 0;
+    for (const QModelIndex& idx : rows) {
+        auto* item = m_table->item(idx.row(), kColStatus);
+        if (!item)
+            continue;
+        const QUuid id = item->data(kRoleId).toUuid();
+        if (m_manager->setDisabled(id, true))
+            ++n;
+    }
+    if (n == 0)
+        QMessageBox::information(this, tr("Disable"),
+                                 tr("Select an active (non-DONE) alarm to disable."));
+}
+
+void MainWindow::enableSelected() {
+    const auto rows = m_table->selectionModel()->selectedRows();
+    if (rows.isEmpty()) {
+        QMessageBox::information(this, tr("Enable"), tr("Select a disabled alarm to enable."));
+        return;
+    }
+    int n = 0;
+    for (const QModelIndex& idx : rows) {
+        auto* item = m_table->item(idx.row(), kColStatus);
+        if (!item)
+            continue;
+        const QUuid id = item->data(kRoleId).toUuid();
+        if (const Alarm* a = m_manager->alarmById(id); a && a->disabled)
+            if (m_manager->setDisabled(id, false))
+                ++n;
+    }
+    if (n == 0)
+        QMessageBox::information(this, tr("Enable"),
+                                 tr("Select a disabled alarm to enable."));
+}
+
+void MainWindow::showAbout() {
+    QMessageBox::about(
+        this, tr("About AlarmQt"),
+        tr("<h3>AlarmQt %1</h3>"
+           "<p>Keyboard-friendly system-tray alarm / reminder.</p>"
+           "<p>License: GPL-3.0-or-later</p>"
+           "<p><a href=\"https://github.com/Grumbel/alarmqt\">"
+           "https://github.com/Grumbel/alarmqt</a></p>")
+            .arg(QApplication::applicationVersion()));
+}
+
 void MainWindow::createTray() {
+
     m_tray = new QSystemTrayIcon(this);
     m_tray->setIcon(QIcon(QStringLiteral(":/icons/alarm.svg")));
     m_tray->setToolTip(tr("AlarmQt"));
@@ -547,12 +629,23 @@ void MainWindow::onTableContextMenu(const QPoint& pos) {
     menu.addAction(tr("Edit…"), this, &MainWindow::editSelected);
     menu.addAction(tr("Restart"), this, &MainWindow::restartSelected);
     bool anyRecurring = false;
+    bool anyDisableable = false;
+    bool anyDisabled = false;
     for (const QModelIndex& idx : m_table->selectionModel()->selectedRows()) {
         if (auto* item = m_table->item(idx.row(), kColStatus))
-            if (const Alarm* a = m_manager->alarmById(item->data(kRoleId).toUuid()))
+            if (const Alarm* a = m_manager->alarmById(item->data(kRoleId).toUuid())) {
                 anyRecurring |= a->recurrence.isRecurring();
+                if (!a->acknowledged) {
+                    if (a->disabled)
+                        anyDisabled = true;
+                    else
+                        anyDisableable = true;
+                }
+            }
     }
     menu.addAction(tr("Skip next"), this, &MainWindow::skipSelected)->setEnabled(anyRecurring);
+    menu.addAction(tr("Disable"), this, &MainWindow::disableSelected)->setEnabled(anyDisableable);
+    menu.addAction(tr("Enable"), this, &MainWindow::enableSelected)->setEnabled(anyDisabled);
     menu.addSeparator();
     menu.addAction(tr("Remove"), this, &MainWindow::removeSelected);
     menu.addAction(tr("Clear all DONE"), this, &MainWindow::clearDoneAlarms);
@@ -745,6 +838,8 @@ void MainWindow::refreshList() {
         QString remaining;
         if (a.acknowledged) {
             remaining = QStringLiteral("—");
+        } else if (a.disabled) {
+            remaining = tr("disabled");
         } else if (a.snoozed) {
             remaining = tr("snooze %1").arg(a.remainingString());
         } else {
