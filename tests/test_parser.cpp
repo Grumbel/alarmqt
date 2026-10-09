@@ -198,6 +198,15 @@ void TestParser::relative_weeks_months() {
     const QDateTime local = c->triggerUtc.toLocalTime();
     const QDateTime now = QDateTime::currentDateTime();
     QCOMPARE(local.date(), now.date().addMonths(1));
+
+    auto d = AlarmManager::parse(QStringLiteral("in 3 years"));
+    QVERIFY(d.has_value());
+    QCOMPARE(d->triggerUtc.toLocalTime().date(), now.date().addYears(3));
+
+    auto e = AlarmManager::parse(QStringLiteral("1 year warranty"));
+    QVERIFY(e.has_value());
+    QCOMPARE(e->command, QStringLiteral("1 year"));
+    QCOMPARE(e->label, QStringLiteral("warranty"));
 }
 
 void TestParser::absolute_date_ampm() {
@@ -353,8 +362,8 @@ void TestParser::invalid_inputs() {
     QVERIFY(!AlarmManager::parse(QStringLiteral("at")).has_value());
     // Unit letters must not be the start of an unrelated word
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 5 hamburgers")).has_value());
-    // years not supported (months/weeks are)
-    QVERIFY(!AlarmManager::parse(QStringLiteral("in 3 years")).has_value());
+    // Unsupported calendar units
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 3 decades")).has_value());
     // Absurd durations are rejected instead of overflowing
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 99999999999999999999d")).has_value());
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 999999999999d")).has_value());

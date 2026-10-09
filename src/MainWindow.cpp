@@ -350,7 +350,7 @@ void MainWindow::showSyntaxHelp() {
         "<li><code>in 2h30m</code> &nbsp; <code>in 1d</code></li>"
         "<li><code>in 10 mins</code> &nbsp; <code>in 2 hours</code> &nbsp; "
         "<code>in 1 hour 15 minutes</code></li>"
-        "<li><code>in 2 weeks</code> &nbsp; <code>in 1 month</code></li>"
+        "<li><code>in 2 weeks</code> &nbsp; <code>in 1 month</code> &nbsp; <code>in 3 years</code></li>"
         "</ul>"
         "<p>Units: <code>s</code>/<code>sec</code>/<code>secs</code>/<code>second</code>/<code>seconds</code>, "
         "<code>m</code>/<code>min</code>/<code>mins</code>/<code>minute</code>/<code>minutes</code>, "

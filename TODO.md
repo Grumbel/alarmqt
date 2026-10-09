@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** fix invalid_inputs for months support
-- **Next bundle NNN:** 036
+- **Current tip:** relative `in N years`
+- **Next bundle NNN:** 037
 
 ## Status
 
@@ -18,9 +18,21 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 - [ ] Mute / volume for notification sound
 - [ ] Shell completions (bash/zsh/fish)
 
+## Parser extension ideas (not committed)
+
+- Combined calendar units: `in 1 year 2 months`, `in 2 weeks 3 days`
+- `this friday 18:00` (this week if still future, else next)
+- `next week` / `next week monday 9:00`
+- Yearly recurrence: `every year on 10-06 at 9:00` / `yearly on Oct 6`
+- `until` / count on recurring rules
+- Half-hour synonyms: `in half an hour`, `in a quarter hour`
+- `end of day` / `eod` as time tokens
+- ISO week dates, bare `+5m` CLI form — low priority
+
 ## Done recently
 
-- Test: `in 3 months` is valid; invalid_inputs rejects `in 3 years` instead
+- Relative `in 3 years` / `1 year` (calendar `addYears`, same path as months)
+- Test: `in 3 months` is valid; invalid_inputs rejects `in 3 decades` instead
 - Monthly recurrence: `every month on the 6th at 9:00`, `monthly on 15 at 18:00`,
   `each month on the 1st 9am` — local wall-clock; months lacking that day are
   skipped (e.g. 31st in February)
@@ -56,4 +68,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-035.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-036.*.bundle` from artifacts (cumulative from `071e920`).

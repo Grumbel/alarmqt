@@ -110,6 +110,18 @@ static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
         return nowLocal.addMonths(n);
     }
 
+    // in 3 years — calendar years
+    static const QRegularExpression yearsRe(
+        QStringLiteral(R"(\A(?:in\s+)?(\d+)\s*years?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto ym = yearsRe.match(t); ym.hasMatch()) {
+        bool ok = false;
+        const int n = ym.captured(1).toInt(&ok);
+        if (!ok || n <= 0 || n > 100)
+            return {};
+        return nowLocal.addYears(n);
+    }
+
     return {};
 }
 
@@ -528,10 +540,10 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
             }
         }
     }
-    static const QRegularExpression weekMonthPrefix(
-        QStringLiteral(R"(\A((?:in\s+)?\d+\s*(?:weeks?|months?))\b)"),
+    static const QRegularExpression weekMonthYearPrefix(
+        QStringLiteral(R"(\A((?:in\s+)?\d+\s*(?:weeks?|months?|years?))\b)"),
         QRegularExpression::CaseInsensitiveOption);
-    if (auto wm = weekMonthPrefix.match(trimmed); wm.hasMatch()) {
+    if (auto wm = weekMonthYearPrefix.match(trimmed); wm.hasMatch()) {
         const QString rest = trimmed.mid(wm.capturedLength(0)).trimmed();
         if (!rest.isEmpty()) {
             *timePart = wm.captured(1).trimmed();
@@ -581,7 +593,7 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     } else {
         splitTimeAndNote(trimmed, &timePart, &note);
         if (timePart.contains(QRegularExpression(
-                R"(\bin\b|\d+\s*(?:[dhms]|weeks?|months?))",
+                R"(\bin\b|\d+\s*(?:[dhms]|weeks?|months?|years?))",
                 QRegularExpression::CaseInsensitiveOption))) {
             // Prefer relative if it looks like one
             triggerLocal = parseRelative(timePart, nowLocal);
