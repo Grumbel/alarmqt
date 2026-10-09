@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QPushButton>
+#include <QDialogButtonBox>
 #include <QPainter>
 #include <QScreen>
 #include <QSoundEffect>
@@ -120,18 +121,16 @@ QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** when
     return center;
 }
 
-QHBoxLayout* buildButtons(QWidget* parent, NotificationDialog* dlg, const Alarm& alarm)
+QDialogButtonBox* buildButtons(QWidget* parent, NotificationDialog* dlg, const Alarm& alarm)
 {
-    auto* row = new QHBoxLayout;
-    row->setSpacing(12);
-
-    auto* ack = new QPushButton(QObject::tr("Acknowledge"), parent);
+    // Standard roles → platform layout (GNOME: actions then Accept on the right).
+    auto* box = new QDialogButtonBox(parent);
+    auto* snooze5 = box->addButton(QObject::tr("Snooze 5m"), QDialogButtonBox::ActionRole);
+    auto* snooze10 = box->addButton(QObject::tr("Snooze 10m"), QDialogButtonBox::ActionRole);
+    auto* ack = box->addButton(QObject::tr("Acknowledge"), QDialogButtonBox::AcceptRole);
     ack->setDefault(true);
-    ack->setMinimumHeight(36);
-    auto* snooze5 = new QPushButton(QObject::tr("Snooze 5m"), parent);
-    auto* snooze10 = new QPushButton(QObject::tr("Snooze 10m"), parent);
-    snooze5->setMinimumHeight(36);
-    snooze10->setMinimumHeight(36);
+    for (auto* b : {snooze5, snooze10, ack})
+        b->setMinimumHeight(36);
 
     QObject::connect(ack, &QPushButton::clicked, dlg, [dlg, id = alarm.id]() {
         emit dlg->acknowledged(id);
@@ -145,13 +144,7 @@ QHBoxLayout* buildButtons(QWidget* parent, NotificationDialog* dlg, const Alarm&
         emit dlg->snoozed(id, 10);
         dlg->accept();
     });
-
-    row->addStretch(1);
-    row->addWidget(ack);
-    row->addWidget(snooze5);
-    row->addWidget(snooze10);
-    row->addStretch(1);
-    return row;
+    return box;
 }
 } // namespace
 
@@ -233,7 +226,7 @@ void NotificationDialog::buildStandardOrSimple()
 
     auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, this, false);
     auto* centerLayout = qobject_cast<QVBoxLayout*>(center->layout());
-    centerLayout->addLayout(buildButtons(center, this, m_alarm));
+    centerLayout->addWidget(buildButtons(center, this, m_alarm), 0, Qt::AlignHCenter);
     root->addWidget(center, 1);
 
     if (withStrips)
@@ -266,14 +259,10 @@ void NotificationDialog::buildFullscreen()
     auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, m_flashRoot, true);
     root->addWidget(center, 1);
 
-    auto* btnWrap = new QWidget(m_flashRoot);
-    btnWrap->setStyleSheet(QStringLiteral(
+    auto* buttons = buildButtons(m_flashRoot, this, m_alarm);
+    buttons->setStyleSheet(QStringLiteral(
         "QPushButton { font-size: 16px; min-width: 140px; padding: 10px 18px; }"));
-    auto* btnLayout = new QHBoxLayout(btnWrap);
-    btnLayout->setContentsMargins(0, 0, 0, 0);
-    auto* buttons = buildButtons(btnWrap, this, m_alarm);
-    btnLayout->addLayout(buttons);
-    root->addWidget(btnWrap);
+    root->addWidget(buttons, 0, Qt::AlignHCenter);
 }
 
 NotificationDialog::~NotificationDialog() {

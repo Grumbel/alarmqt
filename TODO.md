@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** fix fullscreen ringing clock aspect ratio
-- **Next bundle NNN:** 044
+- **Current tip:** platform button order on alarm notification
+- **Next bundle NNN:** 045
 
 ## Status
 
@@ -17,6 +17,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Alarm notification buttons use QDialogButtonBox roles (Snooze as
+  Action, Acknowledge as Accept) for platform order
 - Fullscreen notification keeps the ringing-clock SVG aspect ratio (no
   stretch to square)
 - Dialog buttons use Qt standard roles so Cancel/Ok (and Cancel/Delete)
@@ -46,4 +48,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-043.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-044.*.bundle` from artifacts (cumulative from `071e920`).
