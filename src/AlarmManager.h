@@ -37,6 +37,8 @@ public:
     bool restart(const QUuid& id);
     /** Permanently remove all acknowledged alarms. Returns count removed. */
     int clearDone();
+    /** Pause or resume an alarm. Disabled alarms never fire until re-enabled. */
+    bool setDisabled(const QUuid& id, bool disabled);
 
     void load();
     void save() const;

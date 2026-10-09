@@ -19,6 +19,7 @@ QJsonObject Alarm::toJson() const {
     o["triggered"] = triggered;
     o["snoozed"] = snoozed;
     o["missed"] = missed;
+    o["disabled"] = disabled;
     return o;
 }
 
@@ -43,6 +44,7 @@ Alarm Alarm::fromJson(const QJsonObject& obj) {
     a.triggered = obj["triggered"].toBool(false);
     a.snoozed = obj["snoozed"].toBool(false);
     a.missed = obj["missed"].toBool(false);
+    a.disabled = obj["disabled"].toBool(false);
     return a;
 }
 
@@ -57,6 +59,8 @@ QString Alarm::displayName() const {
 QString Alarm::statusText(const QDateTime& nowUtc) const {
     if (acknowledged)
         return QStringLiteral("DONE");
+    if (disabled)
+        return QStringLiteral("DISABLED");
     if (missed)
         return QStringLiteral("MISSED");
     if (triggered || isDue(nowUtc))
@@ -71,7 +75,7 @@ qint64 Alarm::remainingMs(const QDateTime& nowUtc) const {
 }
 
 bool Alarm::isDue(const QDateTime& nowUtc) const {
-    return !acknowledged && remainingMs(nowUtc) <= 0;
+    return !acknowledged && !disabled && remainingMs(nowUtc) <= 0;
 }
 
 QString Alarm::remainingString(const QDateTime& nowUtc) const {

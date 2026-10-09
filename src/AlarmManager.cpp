@@ -928,6 +928,7 @@ bool AlarmManager::restart(const QUuid& id) {
             a->triggered = false;
             a->snoozed = false;
             a->missed = false;
+            a->disabled = false;
             sortAlarms();
             save();
             emit alarmsChanged();
@@ -942,13 +943,37 @@ bool AlarmManager::restart(const QUuid& id) {
     a->triggered = false;
     a->snoozed = false;
     a->missed = false;
+    a->disabled = false;
     sortAlarms();
     save();
     emit alarmsChanged();
     return true;
 }
 
+bool AlarmManager::setDisabled(const QUuid& id, bool disabled) {
+    Alarm* a = alarmById(id);
+    if (!a || a->acknowledged)
+        return false;
+    if (a->disabled == disabled)
+        return true;
+    a->disabled = disabled;
+    if (disabled) {
+        // Stop an in-progress notification; keep trigger time for when re-enabled.
+        a->triggered = false;
+        save();
+        emit alarmAcknowledged(id); // closes open notification dialogs
+        emit alarmsChanged();
+    } else {
+        // Past-due alarms will fire on the next tick via isDue().
+        a->missed = false;
+        save();
+        emit alarmsChanged();
+    }
+    return true;
+}
+
 void AlarmManager::tick() {
+
     const QDateTime now = QDateTime::currentDateTimeUtc();
     // Collect first: receivers may modify the alarm list (ack, snooze, ...).
     QVector<Alarm> fired;
@@ -969,7 +994,7 @@ void AlarmManager::tick() {
 std::optional<Alarm> AlarmManager::nextAlarm() const {
     std::optional<Alarm> best;
     for (const auto& a : m_alarms) {
-        if (a.acknowledged)
+        if (a.acknowledged || a.disabled)
             continue;
         if (!best || a.triggerUtc < best->triggerUtc)
             best = a;

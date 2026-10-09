@@ -22,6 +22,7 @@ struct Alarm {
     bool triggered = false;
     bool snoozed = false;    // triggerUtc is a snooze deferral of scheduledUtc
     bool missed = false;     // was due while the app was not running
+    bool disabled = false;   // paused: never fires until re-enabled
 
     QJsonObject toJson() const;
     static Alarm fromJson(const QJsonObject& obj);
@@ -29,7 +30,7 @@ struct Alarm {
     /** Prefer label for UI; fall back to command. */
     QString displayName() const;
 
-    /** DONE / MISSED / DUE / SNOOZED / ACTIVE */
+    /** DONE / DISABLED / MISSED / DUE / SNOOZED / ACTIVE */
     QString statusText(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
 
     QString remainingString(const QDateTime& nowUtc = QDateTime::currentDateTimeUtc()) const;
