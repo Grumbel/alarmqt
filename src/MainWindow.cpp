@@ -17,6 +17,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QStyle>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -52,22 +53,42 @@ constexpr auto kNotifyStyleKey = "notification/style";
 constexpr auto kNotifyMuteKey = "notification/muted";
 constexpr auto kNotifyVolumeKey = "notification/volume";
 
-/** Confirm a destructive action. Uses standard button *roles* so Qt lays out
- *  Cancel / Delete in the platform order (GNOME: Cancel then Delete; Windows
- *  may reverse). Cancel is the default (safer for destructive ops). */
+/** Confirm a destructive action with Cancel + Delete.
+ *  QDialogButtonBox roles drive platform order (GNOME: Cancel then Delete).
+ *  Cancel is default and Escape target. */
 bool confirmDelete(QWidget* parent, const QString& title, const QString& text)
 {
-    QMessageBox box(parent);
-    box.setIcon(QMessageBox::Warning);
-    box.setWindowTitle(title);
-    box.setText(text);
-    // Roles drive platform-aware order via QDialogButtonBox; label text is custom.
-    auto* cancelBtn = box.addButton(QMessageBox::Cancel);
-    auto* deleteBtn = box.addButton(QObject::tr("Delete"), QMessageBox::DestructiveRole);
-    box.setDefaultButton(cancelBtn);
-    box.setEscapeButton(cancelBtn);
-    box.exec();
-    return box.clickedButton() == deleteBtn;
+    QDialog dlg(parent);
+    dlg.setWindowTitle(title);
+    dlg.setModal(true);
+
+    auto* root = new QVBoxLayout(&dlg);
+    root->setSizeConstraint(QLayout::SetFixedSize);
+
+    auto* row = new QHBoxLayout;
+    auto* icon = new QLabel;
+    const QIcon warn = dlg.style()->standardIcon(QStyle::SP_MessageBoxWarning);
+    icon->setPixmap(warn.pixmap(48, 48));
+    row->addWidget(icon, 0, Qt::AlignTop);
+
+    auto* label = new QLabel(text);
+    label->setWordWrap(true);
+    label->setMinimumWidth(280);
+    row->addWidget(label, 1);
+    root->addLayout(row);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+    auto* deleteBtn = buttons->addButton(QObject::tr("Delete"), QDialogButtonBox::DestructiveRole);
+    if (auto* cancelBtn = buttons->button(QDialogButtonBox::Cancel)) {
+        cancelBtn->setDefault(true);
+        cancelBtn->setAutoDefault(true);
+    }
+    root->addWidget(buttons);
+
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    QObject::connect(deleteBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    return dlg.exec() == QDialog::Accepted;
 }
 
 class AlarmListCommand : public QUndoCommand {
