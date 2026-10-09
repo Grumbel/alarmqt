@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** `next monday 5:50pm` one-shot absolute times
-- **Next bundle NNN:** 033
+- **Current tip:** today/tomorrow, bare weekday, weeks/months, date+am/pm, noon/midnight
+- **Next bundle NNN:** 034
 
 ## Status
 
@@ -20,6 +20,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Parser: `today`/`tomorrow` + time; bare weekday (`monday 9:00`, `next` optional);
+  `in 2 weeks` / `in 1 month`; full date + am/pm (`at 2026-10-06 5:00pm`);
+  `noon` / `midnight` as time tokens
 - `next monday 5:50pm` / `next mon at 9:00` — one-shot absolute at the next
   matching weekday (local wall-clock, same DST rules as weekly recurrence);
   optional note; not recurring
@@ -49,4 +52,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-032.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-033.*.bundle` from artifacts (cumulative from `071e920`).

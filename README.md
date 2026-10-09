@@ -7,8 +7,9 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
 ## Features
 
 - **Relative & absolute alarms**
-  - `in 5m`, `in 2h30m`, `in 1d`, `in 10 mins`, `in 2 hours`
-  - `at 15:10`, `at 2026-10-03 09:00`, `6:00pm`, `6am`, `next monday 5:50pm`
+  - `in 5m`, `in 2h30m`, `in 1d`, `in 10 mins`, `in 2 hours`, `in 2 weeks`, `in 1 month`
+  - `at 15:10`, `at 2026-10-03 09:00`, `at 2026-10-06 5:00pm`, `6:00pm`, `6am`, `noon`, `midnight`
+  - `today 17:00`, `tomorrow 9:00`, `next monday 5:50pm`, `monday 9:00`
   - glued zone on absolute times: `at 15:10CEST`, `at 12:00Z`, `at 15:10+02:00` (space starts a label)
   - repeating: `every 5m`, `every monday at 18:00`, `every mon, thu 6pm`,
     `daily at 7:30`, `every weekday at 9:00` (`each` works too)

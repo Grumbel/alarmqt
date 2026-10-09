@@ -16,6 +16,10 @@ private slots:
     void absolute_time_only();
     void absolute_full_date();
     void absolute_next_weekday();
+    void absolute_today_tomorrow();
+    void relative_weeks_months();
+    void absolute_date_ampm();
+    void absolute_noon_midnight();
     void absolute_american_ampm();
     void absolute_glued_timezone();
     void notes_trailing_words();
@@ -142,9 +146,81 @@ void TestParser::absolute_next_weekday() {
     QCOMPARE(c->triggerUtc.toLocalTime().date().dayOfWeek(), 5); // Friday
     QCOMPARE(c->triggerUtc.toLocalTime().time().hour(), 18);
 
+    // Bare weekday (no "next") — same meaning
+    auto d = AlarmManager::parse(QStringLiteral("monday 9:00"));
+    QVERIFY(d.has_value());
+    QVERIFY(!d->recurrence.isRecurring());
+    QCOMPARE(d->triggerUtc.toLocalTime().date().dayOfWeek(), 1);
+    QCOMPARE(d->triggerUtc.toLocalTime().time().hour(), 9);
+
     // No time → invalid
     QVERIFY(!AlarmManager::parse(QStringLiteral("next monday")).has_value());
     QVERIFY(!AlarmManager::parse(QStringLiteral("next hamburger 5pm")).has_value());
+}
+
+void TestParser::absolute_today_tomorrow() {
+    auto a = AlarmManager::parse(QStringLiteral("tomorrow 9:00"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("tomorrow 9:00"));
+    const QDateTime local = a->triggerUtc.toLocalTime();
+    QCOMPARE(local.time().hour(), 9);
+    QCOMPARE(local.time().minute(), 0);
+    QCOMPARE(local.date(), QDate::currentDate().addDays(1));
+
+    auto b = AlarmManager::parse(QStringLiteral("today at 23:59 almost"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("today at 23:59"));
+    QCOMPARE(b->label, QStringLiteral("almost"));
+    QCOMPARE(b->triggerUtc.toLocalTime().date(), QDate::currentDate());
+    QCOMPARE(b->triggerUtc.toLocalTime().time().hour(), 23);
+    QCOMPARE(b->triggerUtc.toLocalTime().time().minute(), 59);
+
+    auto c = AlarmManager::parse(QStringLiteral("tomorrow noon"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->triggerUtc.toLocalTime().time(), QTime(12, 0));
+    QCOMPARE(c->triggerUtc.toLocalTime().date(), QDate::currentDate().addDays(1));
+}
+
+void TestParser::relative_weeks_months() {
+    auto a = AlarmManager::parse(QStringLiteral("in 2 weeks"));
+    QVERIFY(a.has_value());
+    const qint64 s = QDateTime::currentDateTimeUtc().secsTo(a->triggerUtc);
+    QVERIFY2(s >= 13 * 86400 && s <= 15 * 86400, qPrintable(QString::number(s)));
+
+    auto b = AlarmManager::parse(QStringLiteral("1 week laundry"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("1 week"));
+    QCOMPARE(b->label, QStringLiteral("laundry"));
+
+    auto c = AlarmManager::parse(QStringLiteral("in 1 month"));
+    QVERIFY(c.has_value());
+    const QDateTime local = c->triggerUtc.toLocalTime();
+    const QDateTime now = QDateTime::currentDateTime();
+    QCOMPARE(local.date(), now.date().addMonths(1));
+}
+
+void TestParser::absolute_date_ampm() {
+    auto a = AlarmManager::parse(QStringLiteral("at 2099-10-06 5:00pm"));
+    QVERIFY(a.has_value());
+    const QDateTime local = a->triggerUtc.toLocalTime();
+    QCOMPARE(local.date(), QDate(2099, 10, 6));
+    QCOMPARE(local.time().hour(), 17);
+    QCOMPARE(local.time().minute(), 0);
+
+    auto b = AlarmManager::parse(QStringLiteral("at 2099-10-06 5pm ship"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->label, QStringLiteral("ship"));
+    QCOMPARE(b->triggerUtc.toLocalTime().time().hour(), 17);
+}
+
+void TestParser::absolute_noon_midnight() {
+    auto a = AlarmManager::parse(QStringLiteral("noon"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->triggerUtc.toLocalTime().time(), QTime(12, 0));
+
+    auto b = AlarmManager::parse(QStringLiteral("midnight"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->triggerUtc.toLocalTime().time(), QTime(0, 0));
 }
 
 void TestParser::absolute_american_ampm() {

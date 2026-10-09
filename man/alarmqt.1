@@ -46,6 +46,8 @@ Raise the existing main window.
 .BR in\ 5m ,
 .BR in\ 2h30m ,
 .BR in\ 1d ,
+.BR in\ 2\ weeks ,
+.BR in\ 1\ month ,
 .BR 5m ,
 .BR 30s
 .SS Absolute
@@ -56,12 +58,26 @@ Raise the existing main window.
 .BR 6am
 (next occurrence if that clock time has already passed today)
 .PP
+.BR today\ 17:00 ,
+.BR tomorrow\ 9:00 ,
+.BR tomorrow\ noon
+— today or tomorrow at the given local time.
+.PP
 .BR next\ monday\ 5:50pm ,
+.BR monday\ 9:00 ,
 .BR next\ mon\ at\ 9:00
 — the next matching weekday at that local wall-clock time (not a repeating
-alarm). Day names may be short or full; optional
+alarm). Leading
+.B next
+is optional. Day names may be short or full; optional
 .BR at
 before the time.
+.PP
+.BR noon
+and
+.B midnight
+are accepted as times (12:00 and 00:00). Full dates accept am/pm:
+.BR at\ 2026\-10\-06\ 5:00pm .
 .PP
 Optional
 .B glued
