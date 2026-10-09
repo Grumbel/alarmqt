@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** notification styles, Delete/Cancel, Edit/Undo/Redo
-- **Next bundle NNN:** 041
+- **Current tip:** interval auto-roll + mute/volume
+- **Next bundle NNN:** 042
 
 ## Status
 
@@ -12,13 +12,15 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Open
 
-- [ ] Recurring alarms, follow-ups: auto-close an unanswered interval
-      notification when the next one is due; `until` / count limits
-- [ ] Mute / volume for notification sound
+- [ ] Recurring alarms: `until` / count limits
 - [ ] Shell completions (bash/zsh/fish)
 
 ## Done recently
 
+- Interval auto-roll: unanswered `every Nm` notification closes when the
+  next slot is due and a fresh one opens (latest due slot)
+- Mute sound (Ctrl+M) and Volume menu (100/75/50/25/10%) in Settings;
+  applied to notification playback
 - Notification styles (Settings): Standard (side blinkers), Simple (no
   strips), Fullscreen flash — persisted in QSettings
 - Delete confirmation uses Delete/Cancel (not Yes/No)
@@ -40,4 +42,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-040.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-041.*.bundle` from artifacts (cumulative from `071e920`).

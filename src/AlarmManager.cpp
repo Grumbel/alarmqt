@@ -980,19 +980,47 @@ void AlarmManager::replaceAll(const QVector<Alarm>& alarms) {
 }
 
 void AlarmManager::tick() {
-
-
     const QDateTime now = QDateTime::currentDateTimeUtc();
+    bool changed = false;
+    QVector<QUuid> rolled;
+
+    // Interval alarms whose notification was left unanswered long enough for the
+    // next slot: close the old occurrence and move to the latest due slot so a
+    // fresh notification can open on the same tick.
+    for (auto& a : m_alarms) {
+        if (a.acknowledged || a.disabled || !a.triggered)
+            continue;
+        if (a.recurrence.kind != Recurrence::Kind::Interval || a.recurrence.intervalSecs <= 0)
+            continue;
+        const qint64 step = a.recurrence.intervalSecs;
+        if (now < a.triggerUtc.addSecs(step))
+            continue;
+        QDateTime slot = a.triggerUtc.addSecs(step);
+        while (slot.addSecs(step) <= now)
+            slot = slot.addSecs(step);
+        a.triggerUtc = slot;
+        a.scheduledUtc = slot;
+        a.triggered = false;
+        a.snoozed = false;
+        a.missed = false;
+        changed = true;
+        rolled.append(a.id);
+    }
+
     // Collect first: receivers may modify the alarm list (ack, snooze, ...).
     QVector<Alarm> fired;
     for (auto& a : m_alarms) {
         if (!a.acknowledged && !a.triggered && a.isDue(now)) {
             a.triggered = true;
             fired.append(a);
+            changed = true;
         }
     }
-    if (!fired.isEmpty())
+    if (changed)
         save();
+    // Close dialogs for rolled occurrences before opening any new ones.
+    for (const QUuid& id : std::as_const(rolled))
+        emit alarmAcknowledged(id);
     for (const Alarm& a : std::as_const(fired))
         emit alarmTriggered(a);
     // Always emit so UI can refresh countdowns

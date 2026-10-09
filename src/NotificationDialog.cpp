@@ -4,6 +4,7 @@
 #include "NotificationDialog.h"
 
 #include <QApplication>
+#include <algorithm>
 #include <QCloseEvent>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -146,7 +147,7 @@ QHBoxLayout* buildButtons(QWidget* parent, NotificationDialog* dlg, const Alarm&
 } // namespace
 
 NotificationDialog::NotificationDialog(const Alarm& alarm, NotificationStyle style,
-                                       QWidget* parent)
+                                       qreal volume, QWidget* parent)
     : QDialog(parent)
     , m_alarm(alarm)
     , m_style(style)
@@ -162,7 +163,8 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, NotificationStyle sty
 
     m_sound = new QSoundEffect(this);
     m_sound->setSource(QUrl(QStringLiteral("qrc:/sounds/alarm.wav")));
-    m_sound->setVolume(0.9);
+    const qreal vol = std::clamp(volume, qreal(0.0), qreal(1.0));
+    m_sound->setVolume(vol);
     m_sound->setLoopCount(1);
 
     connect(&m_blinkTimer, &QTimer::timeout, this, [this]() {
@@ -297,6 +299,8 @@ void NotificationDialog::setBlinkPhase(bool on) {
 
 void NotificationDialog::playSound() {
     if (m_closing)
+        return;
+    if (m_sound && m_sound->volume() <= 0.0)
         return;
     if (m_sound && m_sound->status() != QSoundEffect::Error) {
         m_sound->play();

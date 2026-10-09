@@ -49,6 +49,8 @@ QIcon menuIcon(const char* name) {
 constexpr auto kSettingsOrg = "alarmqt";
 constexpr auto kSettingsApp = "alarmqt";
 constexpr auto kNotifyStyleKey = "notification/style";
+constexpr auto kNotifyMuteKey = "notification/muted";
+constexpr auto kNotifyVolumeKey = "notification/volume";
 
 class AlarmListCommand : public QUndoCommand {
 public:
@@ -308,6 +310,30 @@ void MainWindow::setNotificationStyle(NotificationStyle style) {
     s.setValue(QString::fromLatin1(kNotifyStyleKey), int(style));
 }
 
+bool MainWindow::notificationMuted() const {
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    return s.value(QString::fromLatin1(kNotifyMuteKey), false).toBool();
+}
+
+qreal MainWindow::notificationVolume() const {
+    if (notificationMuted())
+        return 0.0;
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    const qreal v = s.value(QString::fromLatin1(kNotifyVolumeKey), 0.9).toReal();
+    return std::clamp(v, qreal(0.0), qreal(1.0));
+}
+
+void MainWindow::setNotificationMuted(bool muted) {
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    s.setValue(QString::fromLatin1(kNotifyMuteKey), muted);
+}
+
+void MainWindow::setNotificationVolume(qreal volume) {
+    QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+    s.setValue(QString::fromLatin1(kNotifyVolumeKey),
+               std::clamp(volume, qreal(0.0), qreal(1.0)));
+}
+
 void MainWindow::createMenus() {
 
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
@@ -383,6 +409,34 @@ void MainWindow::createMenus() {
     addStyle(tr("Standard (side blinkers)"), NotificationStyle::Standard);
     addStyle(tr("Simple (no side blinkers)"), NotificationStyle::Simple);
     addStyle(tr("Fullscreen flash"), NotificationStyle::Fullscreen);
+
+    settingsMenu->addSeparator();
+    {
+        auto* mute = settingsMenu->addAction(tr("&Mute sound"));
+        mute->setCheckable(true);
+        mute->setChecked(notificationMuted());
+        mute->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
+        connect(mute, &QAction::toggled, this, &MainWindow::setNotificationMuted);
+    }
+    auto* volMenu = settingsMenu->addMenu(tr("&Volume"));
+    auto* volGroup = new QActionGroup(this);
+    volGroup->setExclusive(true);
+    const qreal curVol = [&]() {
+        QSettings s(QString::fromLatin1(kSettingsOrg), QString::fromLatin1(kSettingsApp));
+        return s.value(QString::fromLatin1(kNotifyVolumeKey), 0.9).toReal();
+    }();
+    auto addVol = [&](const QString& label, qreal v) {
+        auto* a = volMenu->addAction(label);
+        a->setCheckable(true);
+        a->setChecked(qAbs(curVol - v) < 0.01);
+        volGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [this, v]() { setNotificationVolume(v); });
+    };
+    addVol(tr("100%"), 1.0);
+    addVol(tr("75%"), 0.75);
+    addVol(tr("50%"), 0.5);
+    addVol(tr("25%"), 0.25);
+    addVol(tr("10%"), 0.1);
 
     auto* helpMenu = menuBar()->addMenu(tr("&Help"));
     {
@@ -1087,7 +1141,7 @@ void MainWindow::showNotification(const Alarm& a) {
         return;
     }
 
-    auto* dlg = new NotificationDialog(a, currentNotificationStyle(), this);
+    auto* dlg = new NotificationDialog(a, currentNotificationStyle(), notificationVolume(), this);
     m_dialogs.insert(a.id, dlg);
 
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {

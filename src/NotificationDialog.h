@@ -25,7 +25,7 @@ class NotificationDialog : public QDialog {
     Q_OBJECT
 public:
     explicit NotificationDialog(const Alarm& alarm, NotificationStyle style,
-                                QWidget* parent = nullptr);
+                                qreal volume = 0.9, QWidget* parent = nullptr);
     ~NotificationDialog() override;
 
     QUuid alarmId() const { return m_alarm.id; }

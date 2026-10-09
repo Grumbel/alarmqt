@@ -53,6 +53,8 @@ private slots:
     void showSyntaxHelp();
     void showAbout();
     void setNotificationStyle(NotificationStyle style);
+    void setNotificationMuted(bool muted);
+    void setNotificationVolume(qreal volume);
 
 private:
     void createTray();
@@ -62,6 +64,8 @@ private:
     /** Run a mutating action under the undo stack (snapshot before/after). */
     void withUndo(const QString& text, const std::function<void()>& action);
     NotificationStyle currentNotificationStyle() const;
+    bool notificationMuted() const;
+    qreal notificationVolume() const; // 0..1 effective volume (0 if muted)
 
     AlarmManager* m_manager;
     QLabel* m_clockIcon = nullptr;
