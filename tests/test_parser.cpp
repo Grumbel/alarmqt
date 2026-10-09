@@ -353,7 +353,8 @@ void TestParser::invalid_inputs() {
     QVERIFY(!AlarmManager::parse(QStringLiteral("at")).has_value());
     // Unit letters must not be the start of an unrelated word
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 5 hamburgers")).has_value());
-    QVERIFY(!AlarmManager::parse(QStringLiteral("in 3 months")).has_value());
+    // years not supported (months/weeks are)
+    QVERIFY(!AlarmManager::parse(QStringLiteral("in 3 years")).has_value());
     // Absurd durations are rejected instead of overflowing
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 99999999999999999999d")).has_value());
     QVERIFY(!AlarmManager::parse(QStringLiteral("in 999999999999d")).has_value());

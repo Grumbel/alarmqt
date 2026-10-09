@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** monthly recurrence (`every month on the 6th at 9:00`)
-- **Next bundle NNN:** 035
+- **Current tip:** fix invalid_inputs for months support
+- **Next bundle NNN:** 036
 
 ## Status
 
@@ -20,6 +20,7 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Test: `in 3 months` is valid; invalid_inputs rejects `in 3 years` instead
 - Monthly recurrence: `every month on the 6th at 9:00`, `monthly on 15 at 18:00`,
   `each month on the 1st 9am` — local wall-clock; months lacking that day are
   skipped (e.g. 31st in February)
@@ -55,4 +56,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-034.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-035.*.bundle` from artifacts (cumulative from `071e920`).
