@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Delete confirm uses QDialogButtonBox order
-- **Next bundle NNN:** 046
+- **Current tip:** Ctrl+N and Ctrl+L focus alarm input
+- **Next bundle NNN:** 047
 
 ## Status
 
@@ -17,6 +17,7 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Focus alarm input: Ctrl+N and Ctrl+L (Add alarm…)
 - Delete / Clear DONE confirm uses QDialogButtonBox (Cancel + Delete
   roles) for the same platform button order as other dialogs
 - Alarm notification buttons use QDialogButtonBox roles (Snooze as
@@ -50,4 +51,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-045.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-046.*.bundle` from artifacts (cumulative from `071e920`).

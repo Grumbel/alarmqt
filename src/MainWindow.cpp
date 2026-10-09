@@ -404,7 +404,8 @@ void MainWindow::createMenus() {
             m_input->setFocus();
             m_input->selectAll();
         });
-        a->setShortcut(QKeySequence::New);
+        // Ctrl+N (New) and Ctrl+L (location-bar style jump to the entry field)
+        a->setShortcuts({QKeySequence::New, QKeySequence(Qt::CTRL | Qt::Key_L)});
     }
     {
         auto* a = alarmMenu->addAction(menuIcon("menu-restart.svg"), tr("&Restart"),
