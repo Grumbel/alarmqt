@@ -20,6 +20,7 @@ private slots:
     void relative_weeks_months();
     void absolute_date_ampm();
     void absolute_noon_midnight();
+    void recurring_monthly();
     void absolute_american_ampm();
     void absolute_glued_timezone();
     void notes_trailing_words();
@@ -221,6 +222,29 @@ void TestParser::absolute_noon_midnight() {
     auto b = AlarmManager::parse(QStringLiteral("midnight"));
     QVERIFY(b.has_value());
     QCOMPARE(b->triggerUtc.toLocalTime().time(), QTime(0, 0));
+}
+
+void TestParser::recurring_monthly() {
+    auto a = AlarmManager::parse(QStringLiteral("every month on the 6th at 9:00"));
+    QVERIFY(a.has_value());
+    QVERIFY(a->recurrence.isRecurring());
+    QCOMPARE(a->recurrence.kind, Recurrence::Kind::Monthly);
+    QCOMPARE(a->recurrence.dayOfMonth, 6);
+    QCOMPARE(a->recurrence.time, QTime(9, 0));
+    QVERIFY(a->triggerUtc > QDateTime::currentDateTimeUtc());
+    QCOMPARE(a->triggerUtc.toLocalTime().time().hour(), 9);
+    QCOMPARE(a->triggerUtc.toLocalTime().date().day(), 6);
+
+    auto b = AlarmManager::parse(QStringLiteral("monthly on 15 at 18:00 rent"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->recurrence.dayOfMonth, 15);
+    QCOMPARE(b->recurrence.time, QTime(18, 0));
+    QCOMPARE(b->label, QStringLiteral("rent"));
+
+    auto c = AlarmManager::parse(QStringLiteral("each month on the 1st 9am"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->recurrence.dayOfMonth, 1);
+    QCOMPARE(c->recurrence.time, QTime(9, 0));
 }
 
 void TestParser::absolute_american_ampm() {

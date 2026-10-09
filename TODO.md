@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** today/tomorrow, bare weekday, weeks/months, date+am/pm, noon/midnight
-- **Next bundle NNN:** 034
+- **Current tip:** monthly recurrence (`every month on the 6th at 9:00`)
+- **Next bundle NNN:** 035
 
 ## Status
 
@@ -14,12 +14,15 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 - [ ] Recurring alarms, follow-ups: auto-close an unanswered interval
       notification when the next one is due; pause/resume; `until` / count
-      limits; monthly rules
+      limits
 - [ ] Mute / volume for notification sound
 - [ ] Shell completions (bash/zsh/fish)
 
 ## Done recently
 
+- Monthly recurrence: `every month on the 6th at 9:00`, `monthly on 15 at 18:00`,
+  `each month on the 1st 9am` — local wall-clock; months lacking that day are
+  skipped (e.g. 31st in February)
 - Parser: `today`/`tomorrow` + time; bare weekday (`monday 9:00`, `next` optional);
   `in 2 weeks` / `in 1 month`; full date + am/pm (`at 2026-10-06 5:00pm`);
   `noon` / `midnight` as time tokens
@@ -52,4 +55,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-033.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-034.*.bundle` from artifacts (cumulative from `071e920`).

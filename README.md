@@ -12,7 +12,8 @@ Simple system-tray alarm / reminder app for Linux (NixOS-friendly).
   - `today 17:00`, `tomorrow 9:00`, `next monday 5:50pm`, `monday 9:00`
   - glued zone on absolute times: `at 15:10CEST`, `at 12:00Z`, `at 15:10+02:00` (space starts a label)
   - repeating: `every 5m`, `every monday at 18:00`, `every mon, thu 6pm`,
-    `daily at 7:30`, `every weekday at 9:00` (`each` works too)
+    `daily at 7:30`, `every weekday at 9:00`, `every month on the 6th at 9:00`
+    (`each` / `monthly` work too)
   - optional note: `in 10m stretch`, `in 5m, water plants`, `at 15:10 team call`
     (also still accepts `(laundry)` / `"pick up kids"`)
 - **Timezone-aware** (uses local timezone by default; stores absolute UTC instants)

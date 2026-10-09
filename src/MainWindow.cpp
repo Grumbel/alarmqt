@@ -400,6 +400,13 @@ void MainWindow::showSyntaxHelp() {
         "<li><code>every weekday at 9:00</code></li>"
         "<li><code>weekends 10am</code> &nbsp; <code>every weekend at 10:00</code></li>"
         "</ul>"
+        "<p><b>Monthly</b> — local wall-clock time on a day of the month. "
+        "Months that lack that day (e.g. the 31st in February) are skipped:</p>"
+        "<ul>"
+        "<li><code>every month on the 6th at 9:00</code></li>"
+        "<li><code>monthly on 15 at 18:00</code></li>"
+        "<li><code>each month on the 1st 9am</code></li>"
+        "</ul>"
         "<p>Acknowledging a repeating alarm schedules the next occurrence "
         "instead of marking it DONE. <b>Skip next</b> (context menu, Ctrl+K) "
         "drops the upcoming occurrence. Remove the alarm to stop it.</p>"
@@ -429,6 +436,7 @@ void MainWindow::showSyntaxHelp() {
         "<li><code>every monday at 18:00 laundry</code></li>"
         "<li><code>every weekday at 9:00 standup</code></li>"
         "<li><code>daily at 7:30</code></li>"
+        "<li><code>every month on the 6th at 9:00</code></li>"
         "</ul>"
     ));
     layout->addWidget(browser);

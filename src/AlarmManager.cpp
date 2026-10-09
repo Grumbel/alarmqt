@@ -306,6 +306,7 @@ static quint8 dayTokenMask(QString token) {
  *   every 5m / each 1h30m / every hour       → Interval
  *   every monday at 18:00 / every mon, thu 6pm
  *   every weekday at 9:00 / daily at 7:30    → Weekly
+ *   every month on the 6th at 9:00 / monthly on 15 at 18:00 → Monthly
  * Anything after the expression becomes the note.
  */
 static bool parseRecurring(const QString& input, QString* timePart, QString* note,
@@ -329,6 +330,26 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
         QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression daySplitRe(
         QStringLiteral(R"(\s*(?:,|/|&|\band\b)\s*)"), QRegularExpression::CaseInsensitiveOption);
+
+    // every month on the 6th at 9:00 / monthly on 15 at 18:00 / each month on the 1st 9am
+    static const QRegularExpression monthlyRe(
+        QStringLiteral(
+            R"(\A(?:(?:every|each)\s+month|monthly)\s+(?:on\s+(?:the\s+)?)?(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(?:at\s+)?)") + kTime,
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = monthlyRe.match(input); m.hasMatch()) {
+        const QTime time = parseTimeOfDay(m.captured(2));
+        if (!time.isValid())
+            return false;
+        const int day = m.captured(1).toInt();
+        if (day < 1 || day > 31)
+            return false;
+        rec->kind = Recurrence::Kind::Monthly;
+        rec->time = time;
+        rec->dayOfMonth = day;
+        *timePart = m.captured(0).trimmed();
+        *note = cleanNote(input.mid(m.capturedLength(0)));
+        return true;
+    }
 
     if (const auto m = weeklyRe.match(input); m.hasMatch()) {
         const QTime time = parseTimeOfDay(m.captured(3));

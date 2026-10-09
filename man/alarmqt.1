@@ -107,10 +107,20 @@ or
 .TP
 .BR daily\ at\ 7:30 ,\ every\ day\ at\ 7:30 ,\ every\ weekday\ at\ 9:00 ,\ weekends\ 10am
 Every day, Monday to Friday, or Saturday and Sunday.
+.TP
+.BR every\ month\ on\ the\ 6th\ at\ 9:00 ,\ monthly\ on\ 15\ at\ 18:00
+Monthly at a local wall-clock time on the given day of the month.
+Months that do not have that day (for example the 31st in February) are
+skipped. Ordinal suffixes
+.RB ( st ,\ nd ,\ rd ,\ th )
+are optional.
 .PP
 .B each
 is accepted in place of
-.BR every .
+.BR every ;
+.B monthly
+is accepted in place of
+.BR every\ month .
 Acknowledging a repeating alarm schedules its next occurrence instead of
 marking it DONE; occurrences missed while the app was not running fire once,
 not once per missed slot.

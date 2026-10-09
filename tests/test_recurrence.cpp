@@ -21,6 +21,8 @@ private slots:
     void interval_next();
     void invalid_rules();
     void describe();
+    void monthly_next_after();
+    void monthly_skips_short_months();
     void json_roundtrip();
 
     void parse_weekly();
@@ -140,6 +142,39 @@ void TestRecurrence::describe() {
              QStringLiteral("Mon, Thu 18:00"));
 }
 
+void TestRecurrence::monthly_next_after() {
+    Recurrence r;
+    r.kind = Recurrence::Kind::Monthly;
+    r.dayOfMonth = 15;
+    r.time = QTime(9, 0);
+
+    // Before the 15th → this month
+    const QDateTime before = QDateTime(QDate(2026, 3, 10), QTime(12, 0), QTimeZone::systemTimeZone()).toUTC();
+    const QDateTime next = r.nextAfter(before);
+    QVERIFY(next.isValid());
+    QCOMPARE(next.toLocalTime().date(), QDate(2026, 3, 15));
+    QCOMPARE(next.toLocalTime().time(), QTime(9, 0));
+
+    // After the 15th → next month
+    const QDateTime after = QDateTime(QDate(2026, 3, 15), QTime(10, 0), QTimeZone::systemTimeZone()).toUTC();
+    const QDateTime next2 = r.nextAfter(after);
+    QCOMPARE(next2.toLocalTime().date(), QDate(2026, 4, 15));
+}
+
+void TestRecurrence::monthly_skips_short_months() {
+    Recurrence r;
+    r.kind = Recurrence::Kind::Monthly;
+    r.dayOfMonth = 31;
+    r.time = QTime(8, 0);
+
+    // After Jan 31 → March 31 (February has no 31st)
+    const QDateTime afterJan = QDateTime(QDate(2026, 1, 31), QTime(9, 0), QTimeZone::systemTimeZone()).toUTC();
+    const QDateTime next = r.nextAfter(afterJan);
+    QVERIFY(next.isValid());
+    QCOMPARE(next.toLocalTime().date(), QDate(2026, 3, 31));
+    QCOMPARE(next.toLocalTime().time(), QTime(8, 0));
+}
+
 void TestRecurrence::json_roundtrip() {
     const Recurrence w = weekly(dayBit(Qt::Friday), QTime(17, 45, 10));
     QCOMPARE(Recurrence::fromJson(w.toJson()), w);
@@ -147,6 +182,12 @@ void TestRecurrence::json_roundtrip() {
     i.kind = Recurrence::Kind::Interval;
     i.intervalSecs = 90;
     QCOMPARE(Recurrence::fromJson(i.toJson()), i);
+    Recurrence mo;
+    mo.kind = Recurrence::Kind::Monthly;
+    mo.dayOfMonth = 6;
+    mo.time = QTime(9, 30);
+    QCOMPARE(Recurrence::fromJson(mo.toJson()), mo);
+    QCOMPARE(mo.describe(), QStringLiteral("monthly 6th 09:30"));
     QCOMPARE(Recurrence::fromJson(QJsonObject()), Recurrence());
 
     // Through Alarm, and old files with the unused "repeating" flag.
