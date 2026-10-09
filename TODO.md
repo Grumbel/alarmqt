@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** interval auto-roll + mute/volume
-- **Next bundle NNN:** 042
+- **Current tip:** platform Cancel/Ok button order
+- **Next bundle NNN:** 043
 
 ## Status
 
@@ -17,6 +17,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Dialog buttons use Qt standard roles so Cancel/Ok (and Cancel/Delete)
+  follow the platform order (GNOME Cancel then action; Windows may reverse)
 - Interval auto-roll: unanswered `every Nm` notification closes when the
   next slot is due and a fresh one opens (latest due slot)
 - Mute sound (Ctrl+M) and Volume menu (100/75/50/25/10%) in Settings;
@@ -42,4 +44,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-041.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-042.*.bundle` from artifacts (cumulative from `071e920`).

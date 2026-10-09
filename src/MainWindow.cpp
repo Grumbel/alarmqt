@@ -52,6 +52,24 @@ constexpr auto kNotifyStyleKey = "notification/style";
 constexpr auto kNotifyMuteKey = "notification/muted";
 constexpr auto kNotifyVolumeKey = "notification/volume";
 
+/** Confirm a destructive action. Uses standard button *roles* so Qt lays out
+ *  Cancel / Delete in the platform order (GNOME: Cancel then Delete; Windows
+ *  may reverse). Cancel is the default (safer for destructive ops). */
+bool confirmDelete(QWidget* parent, const QString& title, const QString& text)
+{
+    QMessageBox box(parent);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(title);
+    box.setText(text);
+    // Roles drive platform-aware order via QDialogButtonBox; label text is custom.
+    auto* cancelBtn = box.addButton(QMessageBox::Cancel);
+    auto* deleteBtn = box.addButton(QObject::tr("Delete"), QMessageBox::DestructiveRole);
+    box.setDefaultButton(cancelBtn);
+    box.setEscapeButton(cancelBtn);
+    box.exec();
+    return box.clickedButton() == deleteBtn;
+}
+
 class AlarmListCommand : public QUndoCommand {
 public:
     AlarmListCommand(AlarmManager* manager, QVector<Alarm> before, QVector<Alarm> after,
@@ -735,15 +753,8 @@ void MainWindow::removeSelected() {
     if (ids.isEmpty())
         return;
 
-    QMessageBox box(this);
-    box.setIcon(QMessageBox::Warning);
-    box.setWindowTitle(tr("Remove alarms"));
-    box.setText(tr("Permanently remove %1 selected alarm(s)?").arg(ids.size()));
-    auto* deleteBtn = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
-    box.addButton(tr("Cancel"), QMessageBox::RejectRole);
-    box.setDefaultButton(deleteBtn);
-    box.exec();
-    if (box.clickedButton() != deleteBtn)
+    if (!confirmDelete(this, tr("Remove alarms"),
+                       tr("Permanently remove %1 selected alarm(s)?").arg(ids.size())))
         return;
 
     withUndo(tr("Remove %1 alarm(s)").arg(ids.size()), [this, ids]() {
@@ -764,15 +775,8 @@ void MainWindow::clearDoneAlarms() {
         QMessageBox::information(this, tr("Clear DONE"), tr("No DONE alarms to clear."));
         return;
     }
-    QMessageBox box(this);
-    box.setIcon(QMessageBox::Warning);
-    box.setWindowTitle(tr("Clear DONE"));
-    box.setText(tr("Permanently remove %1 DONE alarm(s)?").arg(n));
-    auto* deleteBtn = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
-    box.addButton(tr("Cancel"), QMessageBox::RejectRole);
-    box.setDefaultButton(deleteBtn);
-    box.exec();
-    if (box.clickedButton() != deleteBtn)
+    if (!confirmDelete(this, tr("Clear DONE"),
+                       tr("Permanently remove %1 DONE alarm(s)?").arg(n)))
         return;
     withUndo(tr("Clear DONE alarms"), [this]() { m_manager->clearDone(); });
 }
@@ -924,7 +928,9 @@ bool MainWindow::editAlarm(const QUuid& id) {
             commandEdit->setText(opt->command);
     });
 
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    // Standard roles: QDialogButtonBox lays out Cancel/Ok in platform order
+    // (GNOME Cancel|Ok, Windows Ok|Cancel, etc.).
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Ok);
     form->addRow(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
