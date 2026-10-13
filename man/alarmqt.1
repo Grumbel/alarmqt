@@ -128,6 +128,26 @@ not once per missed slot.
 .B Skip next
 (context menu, Ctrl+K) drops the upcoming occurrence.
 To stop a repeating alarm, remove it.
+.SS Leading modifiers
+Optional keywords at the start of the line set notification style or create
+the alarm already disabled. Several may be combined; the remainder is the
+normal time expression.
+.PP
+.TS
+l l.
+simple	Dialog without side blinkers
+normal / standard	Dialog with side blinkers
+max / fullscreen	Full-screen flash
+silent	Blink only, no sound
+notify / tray	System-tray message only
+disabled / paused	Create already disabled
+.TE
+.PP
+Examples:
+.BR "max in 5s" ,
+.BR "simple in 10m stretch" ,
+.BR "disabled every monday at 9:00" ,
+.BR "silent in 1m" .
 .SS Notes
 Text after the time expression becomes the alarm label; the command column
 keeps only the time part:

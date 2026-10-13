@@ -33,6 +33,9 @@ private slots:
     void explicit_label_overrides_note();
     void invalid_inputs();
     void command_is_time_part_only();
+    void leading_modifiers_style();
+    void leading_modifiers_disabled();
+    void leading_modifiers_combined();
 };
 
 static qint64 secsUntil(const Alarm& a) {
@@ -450,6 +453,77 @@ void TestParser::command_is_time_part_only() {
     QCOMPARE(a->command, QStringLiteral("in 2h30m"));
     QCOMPARE(a->label, QStringLiteral("long walk outside"));
     QVERIFY(a->displayName() == a->label);
+}
+
+void TestParser::leading_modifiers_style() {
+    auto a = AlarmManager::parse(QStringLiteral("max in 5s"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5s"));
+    QVERIFY(a->notificationStyle.has_value());
+    QCOMPARE(*a->notificationStyle, NotificationStyle::Fullscreen);
+    QVERIFY(!a->disabled);
+
+    auto b = AlarmManager::parse(QStringLiteral("simple in 10m stretch"));
+    QVERIFY(b.has_value());
+    QCOMPARE(b->command, QStringLiteral("in 10m"));
+    QCOMPARE(b->label, QStringLiteral("stretch"));
+    QCOMPARE(*b->notificationStyle, NotificationStyle::Simple);
+
+    auto c = AlarmManager::parse(QStringLiteral("normal at 15:10"));
+    QVERIFY(c.has_value());
+    QCOMPARE(*c->notificationStyle, NotificationStyle::Standard);
+
+    auto d = AlarmManager::parse(QStringLiteral("silent in 1m"));
+    QVERIFY(d.has_value());
+    QCOMPARE(*d->notificationStyle, NotificationStyle::Silent);
+
+    auto e = AlarmManager::parse(QStringLiteral("notify in 30s"));
+    QVERIFY(e.has_value());
+    QCOMPARE(*e->notificationStyle, NotificationStyle::NotifyOnly);
+
+    auto f = AlarmManager::parse(QStringLiteral("fullscreen every 5m"));
+    QVERIFY(f.has_value());
+    QCOMPARE(*f->notificationStyle, NotificationStyle::Fullscreen);
+    QVERIFY(f->recurrence.isRecurring());
+
+    // No modifier → nullopt (app default)
+    auto g = AlarmManager::parse(QStringLiteral("in 5m"));
+    QVERIFY(g.has_value());
+    QVERIFY(!g->notificationStyle.has_value());
+}
+
+void TestParser::leading_modifiers_disabled() {
+    auto a = AlarmManager::parse(QStringLiteral("disabled in 5m"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QVERIFY(a->disabled);
+    QVERIFY(!a->notificationStyle.has_value());
+
+    auto b = AlarmManager::parse(QStringLiteral("paused every monday at 9:00"));
+    QVERIFY(b.has_value());
+    QVERIFY(b->disabled);
+    QVERIFY(b->recurrence.isRecurring());
+}
+
+void TestParser::leading_modifiers_combined() {
+    auto a = AlarmManager::parse(QStringLiteral("disabled silent in 5m note"));
+    QVERIFY(a.has_value());
+    QCOMPARE(a->command, QStringLiteral("in 5m"));
+    QCOMPARE(a->label, QStringLiteral("note"));
+    QVERIFY(a->disabled);
+    QCOMPARE(*a->notificationStyle, NotificationStyle::Silent);
+
+    // Last style wins
+    auto b = AlarmManager::parse(QStringLiteral("simple max in 10s"));
+    QVERIFY(b.has_value());
+    QCOMPARE(*b->notificationStyle, NotificationStyle::Fullscreen);
+
+    // Trailing "simple" is a label, not a modifier
+    auto c = AlarmManager::parse(QStringLiteral("in 5m simple"));
+    QVERIFY(c.has_value());
+    QCOMPARE(c->command, QStringLiteral("in 5m"));
+    QCOMPARE(c->label, QStringLiteral("simple"));
+    QVERIFY(!c->notificationStyle.has_value());
 }
 
 QTEST_MAIN(TestParser)

@@ -15,9 +15,11 @@
 /** How the ringing alarm is presented. Global default lives in Settings;
  *  individual alarms may override via notificationStyle. */
 enum class NotificationStyle {
-    Standard = 0,  ///< Dialog with alternating red/black side strips
-    Simple = 1,    ///< Same dialog, no side strips
-    Fullscreen = 2 ///< Full-screen overlay that flashes the whole display
+    Standard = 0,   ///< Dialog with alternating red/black side strips + sound
+    Simple = 1,     ///< Same dialog, no side strips + sound
+    Fullscreen = 2, ///< Full-screen overlay that flashes the whole display + sound
+    Silent = 3,     ///< Standard visuals (side blinkers), no sound
+    NotifyOnly = 4  ///< System-tray message only; no dialog, no sound
 };
 
 struct Alarm {

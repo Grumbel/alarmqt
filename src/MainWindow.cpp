@@ -340,6 +340,10 @@ NotificationStyle MainWindow::currentNotificationStyle() const {
         return NotificationStyle::Simple;
     case int(NotificationStyle::Fullscreen):
         return NotificationStyle::Fullscreen;
+    case int(NotificationStyle::Silent):
+        return NotificationStyle::Silent;
+    case int(NotificationStyle::NotifyOnly):
+        return NotificationStyle::NotifyOnly;
     default:
         return NotificationStyle::Standard;
     }
@@ -450,6 +454,8 @@ void MainWindow::createMenus() {
     addStyle(tr("Standard (side blinkers)"), NotificationStyle::Standard);
     addStyle(tr("Simple (no side blinkers)"), NotificationStyle::Simple);
     addStyle(tr("Fullscreen flash"), NotificationStyle::Fullscreen);
+    addStyle(tr("Silent (blink only)"), NotificationStyle::Silent);
+    addStyle(tr("Notification only (tray)"), NotificationStyle::NotifyOnly);
 
     settingsMenu->addSeparator();
     {
@@ -725,6 +731,22 @@ void MainWindow::showSyntaxHelp() {
         "instead of marking it DONE. <b>Skip next</b> (context menu, Ctrl+K) "
         "drops the upcoming occurrence. Remove the alarm to stop it.</p>"
 
+        "<h3>Leading modifiers</h3>"
+        "<p>Optional keywords at the <b>start</b> of the line set notification "
+        "style or pause the alarm. Several may be combined; the rest of the "
+        "line is the normal time expression.</p>"
+        "<ul>"
+        "<li><code>simple</code> — dialog, no side blinkers</li>"
+        "<li><code>normal</code> / <code>standard</code> — dialog with side blinkers</li>"
+        "<li><code>max</code> / <code>fullscreen</code> — full-screen flash</li>"
+        "<li><code>silent</code> — blink only, no sound</li>"
+        "<li><code>notify</code> / <code>tray</code> — system-tray message only</li>"
+        "<li><code>disabled</code> / <code>paused</code> — create already disabled</li>"
+        "</ul>"
+        "<p>Examples: <code>max in 5s</code>, <code>simple in 10m stretch</code>, "
+        "<code>disabled every monday at 9:00</code>, "
+        "<code>silent notify in 1m</code> (last style wins).</p>"
+
         "<h3>Notes (labels)</h3>"
         "<p>Text after the time expression becomes the label:</p>"
         "<ul>"
@@ -737,6 +759,11 @@ void MainWindow::showSyntaxHelp() {
         "<h3>Examples</h3>"
         "<ul>"
         "<li><code>in 5m</code></li>"
+        "<li><code>max in 5s</code></li>"
+        "<li><code>simple in 10m stretch</code></li>"
+        "<li><code>silent in 1m</code></li>"
+        "<li><code>notify at 15:10 team call</code></li>"
+        "<li><code>disabled every monday at 18:00</code></li>"
         "<li><code>in 10m stretch</code></li>"
         "<li><code>in 5m, water plants</code></li>"
         "<li><code>at 15:10 team call</code></li>"
@@ -942,6 +969,8 @@ bool MainWindow::editAlarm(const QUuid& id) {
     styleCombo->addItem(tr("Standard (side blinkers)"), int(NotificationStyle::Standard));
     styleCombo->addItem(tr("Simple (no side blinkers)"), int(NotificationStyle::Simple));
     styleCombo->addItem(tr("Fullscreen flash"), int(NotificationStyle::Fullscreen));
+    styleCombo->addItem(tr("Silent (blink only)"), int(NotificationStyle::Silent));
+    styleCombo->addItem(tr("Notification only (tray)"), int(NotificationStyle::NotifyOnly));
     if (a->notificationStyle) {
         const int idx = styleCombo->findData(int(*a->notificationStyle));
         if (idx >= 0)
@@ -1194,7 +1223,25 @@ void MainWindow::showNotification(const Alarm& a) {
     }
 
     const NotificationStyle style = a.notificationStyle.value_or(currentNotificationStyle());
-    auto* dlg = new NotificationDialog(a, style, notificationVolume(), this);
+
+    // Tray-only: no dialog; leave alarm triggered so the list / renotify can
+    // still surface it until the user acknowledges from the main window.
+    if (style == NotificationStyle::NotifyOnly) {
+        if (m_tray)
+            m_tray->showMessage(tr("Alarm"), a.displayName(),
+                                QSystemTrayIcon::Warning, 10'000);
+        return;
+    }
+
+    // Silent uses Standard visuals (side blinkers) with volume forced to 0.
+    NotificationStyle dialogStyle = style;
+    qreal vol = notificationVolume();
+    if (style == NotificationStyle::Silent) {
+        dialogStyle = NotificationStyle::Standard;
+        vol = 0.0;
+    }
+
+    auto* dlg = new NotificationDialog(a, dialogStyle, vol, this);
     m_dialogs.insert(a.id, dlg);
 
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {

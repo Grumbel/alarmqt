@@ -28,6 +28,12 @@ QJsonObject Alarm::toJson() const {
         case NotificationStyle::Fullscreen:
             o["notificationStyle"] = QStringLiteral("fullscreen");
             break;
+        case NotificationStyle::Silent:
+            o["notificationStyle"] = QStringLiteral("silent");
+            break;
+        case NotificationStyle::NotifyOnly:
+            o["notificationStyle"] = QStringLiteral("notify");
+            break;
         case NotificationStyle::Standard:
         default:
             o["notificationStyle"] = QStringLiteral("standard");
@@ -63,9 +69,14 @@ Alarm Alarm::fromJson(const QJsonObject& obj) {
         const QString s = obj["notificationStyle"].toString().toLower();
         if (s == QLatin1String("simple"))
             a.notificationStyle = NotificationStyle::Simple;
-        else if (s == QLatin1String("fullscreen"))
+        else if (s == QLatin1String("fullscreen") || s == QLatin1String("max"))
             a.notificationStyle = NotificationStyle::Fullscreen;
-        else if (s == QLatin1String("standard"))
+        else if (s == QLatin1String("silent"))
+            a.notificationStyle = NotificationStyle::Silent;
+        else if (s == QLatin1String("notify") || s == QLatin1String("notification")
+                 || s == QLatin1String("tray"))
+            a.notificationStyle = NotificationStyle::NotifyOnly;
+        else if (s == QLatin1String("standard") || s == QLatin1String("normal"))
             a.notificationStyle = NotificationStyle::Standard;
         // unknown values leave nullopt (app default)
     }

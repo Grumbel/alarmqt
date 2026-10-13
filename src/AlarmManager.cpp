@@ -745,8 +745,49 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
     }
 }
 
+/** Consume leading modifier keywords (style / disabled). Case-insensitive.
+ *  Stops at the first non-keyword token. Last style keyword wins; disabled is sticky. */
+static QString consumeLeadingModifiers(const QString& input,
+                                       std::optional<NotificationStyle>* styleOut,
+                                       bool* disabledOut)
+{
+    *styleOut = std::nullopt;
+    *disabledOut = false;
+    const QStringList tokens = input.split(QRegularExpression(QStringLiteral("\\s+")),
+                                           Qt::SkipEmptyParts);
+    int i = 0;
+    for (; i < tokens.size(); ++i) {
+        const QString w = tokens[i].toLower();
+        if (w == QLatin1String("simple")) {
+            *styleOut = NotificationStyle::Simple;
+        } else if (w == QLatin1String("normal") || w == QLatin1String("standard")) {
+            *styleOut = NotificationStyle::Standard;
+        } else if (w == QLatin1String("max") || w == QLatin1String("fullscreen")) {
+            *styleOut = NotificationStyle::Fullscreen;
+        } else if (w == QLatin1String("silent")) {
+            *styleOut = NotificationStyle::Silent;
+        } else if (w == QLatin1String("notify") || w == QLatin1String("notification")
+                   || w == QLatin1String("tray")) {
+            *styleOut = NotificationStyle::NotifyOnly;
+        } else if (w == QLatin1String("disabled") || w == QLatin1String("paused")) {
+            *disabledOut = true;
+        } else {
+            break;
+        }
+    }
+    if (i == 0)
+        return input;
+    return tokens.mid(i).join(QLatin1Char(' '));
+}
+
 std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& label) {
-    const QString trimmed = input.trimmed();
+    const QString trimmedIn = input.trimmed();
+    if (trimmedIn.isEmpty())
+        return std::nullopt;
+
+    std::optional<NotificationStyle> styleMod;
+    bool disabledMod = false;
+    const QString trimmed = consumeLeadingModifiers(trimmedIn, &styleMod, &disabledMod);
     if (trimmed.isEmpty())
         return std::nullopt;
 
@@ -792,6 +833,8 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
     a.triggered = false;
     a.snoozed = false;
     a.missed = false;
+    a.disabled = disabledMod;
+    a.notificationStyle = styleMod;
     return a;
 }
 
@@ -917,6 +960,8 @@ bool AlarmManager::restart(const QUuid& id) {
     if (!expr.isEmpty()) {
         auto opt = parse(expr, a->label);
         if (opt) {
+            // Keep per-alarm style across restart; command has no style keywords.
+            const auto keptStyle = a->notificationStyle;
             a->command = opt->command.isEmpty() ? expr : opt->command;
             a->recurrence = opt->recurrence;
             a->triggerUtc = opt->triggerUtc;
@@ -929,6 +974,7 @@ bool AlarmManager::restart(const QUuid& id) {
             a->snoozed = false;
             a->missed = false;
             a->disabled = false;
+            a->notificationStyle = keptStyle;
             sortAlarms();
             save();
             emit alarmsChanged();

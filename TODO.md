@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Per-alarm notification style in Edit alarm
-- **Next bundle NNN:** 048
+- **Current tip:** Leading modifiers + Silent / NotifyOnly styles
+- **Next bundle NNN:** 049
 
 ## Status
 
@@ -14,14 +14,16 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 - [ ] Recurring alarms: `until` / count limits
 - [ ] Shell completions (bash/zsh/fish)
-- [ ] Text syntax for per-alarm notification style (proposed, not implemented)
 
 ## Done recently
 
+- Leading modifiers on add/parse: `simple` / `normal`|`standard` / `max`|`fullscreen` /
+  `silent` / `notify`|`tray` / `disabled`|`paused` at the start of the expression;
+  stored as per-alarm `notificationStyle` or `disabled` (command keeps time-only)
+- New styles: **Silent** (Standard blinkers, no sound), **NotifyOnly** (tray message
+  only); Edit dialog + Settings menu + JSON + syntax help + man page
 - Per-alarm notification style: Edit alarm dropdown (Default / Standard /
-  Simple / Fullscreen); stored in JSON as `notificationStyle` string when
-  set; `nullopt` uses Settings global style; NotificationDialog uses the
-  override when present
+  Simple / Fullscreen / Silent / Notify only); JSON when set; nullopt → Settings
 - Focus alarm input: Ctrl+N and Ctrl+L (Add alarm…)
 - Delete / Clear DONE confirm uses QDialogButtonBox (Cancel + Delete
   roles) for the same platform button order as other dialogs
@@ -35,8 +37,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
   next slot is due and a fresh one opens (latest due slot)
 - Mute sound (Ctrl+M) and Volume menu (100/75/50/25/10%) in Settings;
   applied to notification playback
-- Notification styles (Settings): Standard (side blinkers), Simple (no
-  strips), Fullscreen flash — persisted in QSettings
+- Notification styles (Settings): Standard, Simple, Fullscreen, Silent,
+  Notification only — persisted in QSettings
 - Delete confirmation uses Delete/Cancel (not Yes/No)
 - Edit menu with Undo/Redo (Ctrl+Z / Ctrl+Shift+Z) for list mutations;
   Edit alarm stays under Edit
@@ -44,16 +46,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 - Main menu bar (File / Alarm / Help) with standard actions and About
 - Disable / Enable alarms (right-click, Alarm menu, Ctrl+P): paused state
   never fires; status DISABLED; gray row; persists in JSON; restart clears it
-- Relative: combined units (`in 1 year 2 months`, `in 2 weeks 3 days`);
-  synonyms (`half an hour`, `quarter hour`, `an hour`, `fortnight`); years
-- Absolute: `this friday`, `next week` / `next week monday`; `eod` / `end of day`;
-  bare hour `at 17`
-- Recurring: yearly (`every year on 10-06 at 9:00`); Nth weekday of month
-  (`every 2nd tuesday at 18:00`, `every last friday…`); biweekly
-  (`every 2 weeks on monday at 9:00`) via weekStride
-- Monthly day-of-month; today/tomorrow; bare weekday; weeks/months; date+am/pm;
-  noon/midnight; next weekday; unpadded full-date hour
+- Relative / absolute / recurring parser expansions (years, this/next week,
+  eod, Nth weekday, biweekly, synonyms, …)
 
 ## Handoff
 
-Apply the latest `alarmqt-047.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-048.*.bundle` from artifacts (cumulative from `071e920`).

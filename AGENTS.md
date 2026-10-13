@@ -17,7 +17,7 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 
 | Piece | Role |
 |-------|------|
-| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, `scheduledUtc`, `recurrence`, flags, optional `notificationStyle`) |
+| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, `scheduledUtc`, `recurrence`, flags, optional `notificationStyle`: Standard/Simple/Fullscreen/Silent/NotifyOnly) |
 | `Recurrence` | Repeat rule (interval / weekly mask + local time); `nextAfter()` |
 | `AlarmManager` | Parse, persist (`$XDG_STATE_HOME/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
@@ -27,6 +27,10 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 - Alarms are stored as absolute UTC; UI shows local time.
 - `command` = time expression (`in 5m`, `at 15:10`); `label` = optional note.
 - Relative / absolute / note parsing lives in `AlarmManager::parse`.
+- Leading modifiers (optional, start of input): style keywords
+  (`simple`, `normal`/`standard`, `max`/`fullscreen`, `silent`,
+  `notify`/`tray`) and `disabled`/`paused`; stripped before time parse;
+  applied to the new Alarm; `command` stays time-only.
 - Acknowledged alarms stay as **DONE** until removed or cleared. Recurring
   alarms never become DONE: acknowledge / Skip next move `scheduledUtc` to
   `Recurrence::nextAfter(max(scheduledUtc, now))`; intervals count from the ack.
