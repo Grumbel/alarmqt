@@ -62,7 +62,28 @@ private:
     QSvgRenderer m_renderer;
 };
 
+/** Human-readable duration for overdue display (e.g. "2h 5m 3s"). */
+static QString formatOverdue(qint64 totalSec)
+{
+    if (totalSec < 0)
+        totalSec = 0;
+    const qint64 days = totalSec / 86400;
+    const qint64 hours = (totalSec % 86400) / 3600;
+    const qint64 mins = (totalSec % 3600) / 60;
+    const qint64 secs = totalSec % 60;
+    QStringList parts;
+    if (days > 0)
+        parts << QStringLiteral("%1d").arg(days);
+    if (hours > 0 || days > 0)
+        parts << QStringLiteral("%1h").arg(hours);
+    if (mins > 0 || hours > 0 || days > 0)
+        parts << QStringLiteral("%1m").arg(mins);
+    parts << QStringLiteral("%1s").arg(secs);
+    return parts.join(QLatin1Char(' '));
+}
+
 QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** whenOut,
+                            QLabel** nowOut, QLabel** overdueOut,
                             QLabel** subtitleOut, QWidget* parent,
                             bool large)
 {
@@ -92,6 +113,24 @@ QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** when
     if (large)
         when->setStyleSheet(QStringLiteral("color: #ffe4e4; font-size: 16px;"));
 
+    auto* now = new QLabel;
+    now->setAlignment(Qt::AlignCenter);
+    if (large)
+        now->setStyleSheet(QStringLiteral("color: #ffffff; font-size: 20px; font-weight: bold;"));
+    else {
+        QFont nf = now->font();
+        nf.setPointSize(nf.pointSize() + 2);
+        nf.setBold(true);
+        now->setFont(nf);
+    }
+
+    auto* overdue = new QLabel;
+    overdue->setAlignment(Qt::AlignCenter);
+    if (large)
+        overdue->setStyleSheet(QStringLiteral("color: #ffd0d0; font-size: 18px; font-weight: bold;"));
+    else
+        overdue->setStyleSheet(QStringLiteral("color: #c53030; font-weight: bold;"));
+
     QLabel* subtitle = nullptr;
     if (alarm.missed) {
         subtitle = new QLabel(QObject::tr("Missed — app was not running at the scheduled time"));
@@ -112,11 +151,15 @@ QWidget* buildContentColumn(const Alarm& alarm, QLabel** titleOut, QLabel** when
     centerLayout->addWidget(clock, 0, Qt::AlignHCenter);
     centerLayout->addWidget(title);
     centerLayout->addWidget(when);
+    centerLayout->addWidget(now);
+    centerLayout->addWidget(overdue);
     centerLayout->addWidget(subtitle);
     centerLayout->addStretch(1);
 
     *titleOut = title;
     *whenOut = when;
+    *nowOut = now;
+    *overdueOut = overdue;
     *subtitleOut = subtitle;
     return center;
 }
@@ -186,6 +229,10 @@ NotificationDialog::NotificationDialog(const Alarm& alarm, NotificationStyle sty
     setBlinkPhase(true);
     playSound();
 
+    connect(&m_clockTimer, &QTimer::timeout, this, &NotificationDialog::updateTimeLabels);
+    m_clockTimer.start(1000);
+    updateTimeLabels();
+
     if (m_style == NotificationStyle::Fullscreen) {
         showFullScreen();
     } else {
@@ -224,7 +271,7 @@ void NotificationDialog::buildStandardOrSimple()
         root->addWidget(makeStrip(&m_leftBlink));
     }
 
-    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, this, false);
+    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_now, &m_overdue, &m_subtitle, this, false);
     auto* centerLayout = qobject_cast<QVBoxLayout*>(center->layout());
     centerLayout->addWidget(buildButtons(center, this, m_alarm), 0, Qt::AlignHCenter);
     root->addWidget(center, 1);
@@ -256,7 +303,7 @@ void NotificationDialog::buildFullscreen()
     auto* root = new QVBoxLayout(m_flashRoot);
     root->setContentsMargins(40, 40, 40, 40);
 
-    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_subtitle, m_flashRoot, true);
+    auto* center = buildContentColumn(m_alarm, &m_title, &m_when, &m_now, &m_overdue, &m_subtitle, m_flashRoot, true);
     root->addWidget(center, 1);
 
     auto* buttons = buildButtons(m_flashRoot, this, m_alarm);
@@ -273,6 +320,7 @@ void NotificationDialog::stopAlert() {
     m_closing = true;
     m_blinkTimer.stop();
     m_soundTimer.stop();
+    m_clockTimer.stop();
     if (m_sound)
         m_sound->stop();
 }
@@ -293,6 +341,26 @@ void NotificationDialog::setBlinkPhase(bool on) {
         m_rightBlink->setStyleSheet(QString::fromUtf8(on ? kStyleBlack : kStyleRed));
     }
     // Simple: no visual blink strips
+}
+
+void NotificationDialog::updateTimeLabels() {
+    if (m_closing)
+        return;
+    const QDateTime nowLocal = QDateTime::currentDateTime();
+    if (m_now)
+        m_now->setText(QObject::tr("Now: %1").arg(
+            nowLocal.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));
+
+    if (m_overdue) {
+        const QDateTime dueUtc = m_alarm.scheduledUtc.isValid() ? m_alarm.scheduledUtc
+                                                                : m_alarm.triggerUtc;
+        const qint64 overdueSec = dueUtc.secsTo(nowLocal.toUTC());
+        if (overdueSec <= 0) {
+            m_overdue->setText(QObject::tr("Due now"));
+        } else {
+            m_overdue->setText(QObject::tr("Overdue by %1").arg(formatOverdue(overdueSec)));
+        }
+    }
 }
 
 void NotificationDialog::playSound() {

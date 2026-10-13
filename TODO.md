@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Leading modifiers + Silent / NotifyOnly styles
-- **Next bundle NNN:** 049
+- **Current tip:** Notification shows live now time + overdue
+- **Next bundle NNN:** 050
 
 ## Status
 
@@ -17,6 +17,9 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Notification dialog shows live local **Now** time and **Overdue by** duration
+  (seconds/minutes/hours past scheduled time), updated every second; Standard,
+  Simple, and Fullscreen layouts
 - Leading modifiers on add/parse: `simple` / `normal`|`standard` / `max`|`fullscreen` /
   `silent` / `notify`|`tray` / `disabled`|`paused` at the start of the expression;
   stored as per-alarm `notificationStyle` or `disabled` (command keeps time-only)
@@ -51,4 +54,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-048.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-049.*.bundle` from artifacts (cumulative from `071e920`).

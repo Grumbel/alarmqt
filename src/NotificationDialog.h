@@ -39,17 +39,21 @@ private:
     void setBlinkPhase(bool on);
     void playSound();
     void stopAlert();
+    void updateTimeLabels();
 
     Alarm m_alarm;
     NotificationStyle m_style = NotificationStyle::Standard;
     QLabel* m_title = nullptr;
     QLabel* m_when = nullptr;
+    QLabel* m_now = nullptr;      // live local clock
+    QLabel* m_overdue = nullptr;  // how far past the alarm time
     QLabel* m_subtitle = nullptr;
     QFrame* m_leftBlink = nullptr;
     QFrame* m_rightBlink = nullptr;
     QWidget* m_flashRoot = nullptr; // fullscreen background
     QTimer m_blinkTimer;
     QTimer m_soundTimer;
+    QTimer m_clockTimer;
     bool m_blinkOn = true;
     bool m_closing = false;
     QSoundEffect* m_sound = nullptr;
