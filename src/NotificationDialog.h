@@ -14,13 +14,6 @@
 
 class QSoundEffect;
 
-/** How the ringing alarm is presented. */
-enum class NotificationStyle {
-    Standard = 0,  ///< Dialog with alternating red/black side strips (default)
-    Simple = 1,    ///< Same dialog, no side strips
-    Fullscreen = 2 ///< Full-screen overlay that flashes the whole display
-};
-
 class NotificationDialog : public QDialog {
     Q_OBJECT
 public:

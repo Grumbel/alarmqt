@@ -17,7 +17,7 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 
 | Piece | Role |
 |-------|------|
-| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, `scheduledUtc`, `recurrence`, flags) |
+| `Alarm` | POD + JSON (`command`, `label`, `triggerUtc`, `scheduledUtc`, `recurrence`, flags, optional `notificationStyle`) |
 | `Recurrence` | Repeat rule (interval / weekly mask + local time); `nextAfter()` |
 | `AlarmManager` | Parse, persist (`$XDG_STATE_HOME/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |

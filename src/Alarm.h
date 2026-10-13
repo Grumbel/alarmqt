@@ -10,6 +10,16 @@
 #include <QUuid>
 #include <QJsonObject>
 
+#include <optional>
+
+/** How the ringing alarm is presented. Global default lives in Settings;
+ *  individual alarms may override via notificationStyle. */
+enum class NotificationStyle {
+    Standard = 0,  ///< Dialog with alternating red/black side strips
+    Simple = 1,    ///< Same dialog, no side strips
+    Fullscreen = 2 ///< Full-screen overlay that flashes the whole display
+};
+
 struct Alarm {
     QUuid id;
     QString command;         // original time expression, e.g. "in 5m" or "at 15:10"
@@ -23,6 +33,8 @@ struct Alarm {
     bool snoozed = false;    // triggerUtc is a snooze deferral of scheduledUtc
     bool missed = false;     // was due while the app was not running
     bool disabled = false;   // paused: never fires until re-enabled
+    /** Per-alarm notification style; nullopt = use app Settings default. */
+    std::optional<NotificationStyle> notificationStyle;
 
     QJsonObject toJson() const;
     static Alarm fromJson(const QJsonObject& obj);

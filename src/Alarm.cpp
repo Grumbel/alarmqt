@@ -20,6 +20,20 @@ QJsonObject Alarm::toJson() const {
     o["snoozed"] = snoozed;
     o["missed"] = missed;
     o["disabled"] = disabled;
+    if (notificationStyle) {
+        switch (*notificationStyle) {
+        case NotificationStyle::Simple:
+            o["notificationStyle"] = QStringLiteral("simple");
+            break;
+        case NotificationStyle::Fullscreen:
+            o["notificationStyle"] = QStringLiteral("fullscreen");
+            break;
+        case NotificationStyle::Standard:
+        default:
+            o["notificationStyle"] = QStringLiteral("standard");
+            break;
+        }
+    }
     return o;
 }
 
@@ -45,6 +59,16 @@ Alarm Alarm::fromJson(const QJsonObject& obj) {
     a.snoozed = obj["snoozed"].toBool(false);
     a.missed = obj["missed"].toBool(false);
     a.disabled = obj["disabled"].toBool(false);
+    if (obj.contains(QStringLiteral("notificationStyle"))) {
+        const QString s = obj["notificationStyle"].toString().toLower();
+        if (s == QLatin1String("simple"))
+            a.notificationStyle = NotificationStyle::Simple;
+        else if (s == QLatin1String("fullscreen"))
+            a.notificationStyle = NotificationStyle::Fullscreen;
+        else if (s == QLatin1String("standard"))
+            a.notificationStyle = NotificationStyle::Standard;
+        // unknown values leave nullopt (app default)
+    }
     return a;
 }
 
@@ -115,5 +139,6 @@ bool operator==(const Alarm& a, const Alarm& b) {
         && a.triggered == b.triggered
         && a.snoozed == b.snoozed
         && a.missed == b.missed
-        && a.disabled == b.disabled;
+        && a.disabled == b.disabled
+        && a.notificationStyle == b.notificationStyle;
 }

@@ -3,8 +3,8 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Ctrl+N and Ctrl+L focus alarm input
-- **Next bundle NNN:** 047
+- **Current tip:** Per-alarm notification style in Edit alarm
+- **Next bundle NNN:** 048
 
 ## Status
 
@@ -14,9 +14,14 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 - [ ] Recurring alarms: `until` / count limits
 - [ ] Shell completions (bash/zsh/fish)
+- [ ] Text syntax for per-alarm notification style (proposed, not implemented)
 
 ## Done recently
 
+- Per-alarm notification style: Edit alarm dropdown (Default / Standard /
+  Simple / Fullscreen); stored in JSON as `notificationStyle` string when
+  set; `nullopt` uses Settings global style; NotificationDialog uses the
+  override when present
 - Focus alarm input: Ctrl+N and Ctrl+L (Add alarm…)
 - Delete / Clear DONE confirm uses QDialogButtonBox (Cancel + Delete
   roles) for the same platform button order as other dialogs
@@ -51,4 +56,4 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Handoff
 
-Apply the latest `alarmqt-046.*.bundle` from artifacts (cumulative from `071e920`).
+Apply the latest `alarmqt-047.*.bundle` from artifacts (cumulative from `071e920`).

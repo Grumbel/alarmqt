@@ -10,6 +10,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QItemSelection>
@@ -935,6 +936,21 @@ bool MainWindow::editAlarm(const QUuid& id) {
     form->addRow(tr("When"), whenEdit);
     form->addRow(QString(), doneCheck);
 
+    auto* styleCombo = new QComboBox;
+    // itemData: -1 = app default; else NotificationStyle int
+    styleCombo->addItem(tr("Default (Settings)"), -1);
+    styleCombo->addItem(tr("Standard (side blinkers)"), int(NotificationStyle::Standard));
+    styleCombo->addItem(tr("Simple (no side blinkers)"), int(NotificationStyle::Simple));
+    styleCombo->addItem(tr("Fullscreen flash"), int(NotificationStyle::Fullscreen));
+    if (a->notificationStyle) {
+        const int idx = styleCombo->findData(int(*a->notificationStyle));
+        if (idx >= 0)
+            styleCombo->setCurrentIndex(idx);
+    } else {
+        styleCombo->setCurrentIndex(0); // Default
+    }
+    form->addRow(tr("Notification style"), styleCombo);
+
     auto* applyCmdBtn = new QPushButton(tr("Apply command → When"));
     form->addRow(QString(), applyCmdBtn);
     QObject::connect(applyCmdBtn, &QPushButton::clicked, &dlg, [this, commandEdit, labelEdit, whenEdit, &dlg]() {
@@ -998,6 +1014,14 @@ bool MainWindow::editAlarm(const QUuid& id) {
     updated.scheduledUtc = updated.triggerUtc;
     updated.snoozed = false;
     updated.missed = false;
+
+    {
+        const int styleData = styleCombo->currentData().toInt();
+        if (styleData < 0)
+            updated.notificationStyle = std::nullopt;
+        else
+            updated.notificationStyle = static_cast<NotificationStyle>(styleData);
+    }
 
     withUndo(tr("Edit alarm"), [this, updated, id]() {
         m_manager->update(updated);
@@ -1169,7 +1193,8 @@ void MainWindow::showNotification(const Alarm& a) {
         return;
     }
 
-    auto* dlg = new NotificationDialog(a, currentNotificationStyle(), notificationVolume(), this);
+    const NotificationStyle style = a.notificationStyle.value_or(currentNotificationStyle());
+    auto* dlg = new NotificationDialog(a, style, notificationVolume(), this);
     m_dialogs.insert(a.id, dlg);
 
     connect(dlg, &NotificationDialog::acknowledged, this, [this](const QUuid& id) {
