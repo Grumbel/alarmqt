@@ -51,12 +51,40 @@ Raise the existing main window.
 .BR in\ 3\ years ,
 .BR 5m ,
 .BR 30s
+.PP
+Also accepted:
+.B in 5:10
+and
+.B in 5:10:00
+(hours:minutes[:seconds]; only after
+.BR in ,
+since a bare
+.B 5:10
+is a clock time),
+decimals
+.RB ( in\ 1.5h ,
+.BR in\ 2.5\ hours ),
+a glued implicit next unit
+.RB ( in\ 1h30 " = 1h30m, " in\ 2m30 " = 2m30s),"
+.B and
+between units
+.RB ( in\ 1\ hour\ and\ 30\ minutes ),
+.BR in\ a\ minute ,
+.BR in\ a\ day ,
+.BR in\ a\ week ,
+.BR in\ an\ hour\ and\ a\ half ,
+and a trailing
+.B from now
+.RB ( in\ 5\ minutes\ from\ now ).
 .SS Absolute
 .BR at\ 15:10 ,
 .BR at\ 2026\-10\-03\ 09:00 ,
 .BR 15:10 ,
 .BR 6:00pm ,
-.BR 6am
+.BR 6am ,
+.BR at\ 15.10 ,
+.BR at\ 3.30pm ,
+.B at 0730
 (next occurrence if that clock time has already passed today)
 .PP
 .BR today\ 17:00 ,

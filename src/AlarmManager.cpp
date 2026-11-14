@@ -12,6 +12,8 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QTimeZone>
+
+#include <cmath>
 #include <optional>
 
 AlarmManager::AlarmManager(QObject* parent)
@@ -36,51 +38,138 @@ Alarm* AlarmManager::alarmById(const QUuid& id) {
     return nullptr;
 }
 
-// One optional "<n> unit" group per unit, in d/h/m/s order. The lookahead
-// keeps "in 5 hamburgers" from matching as "in 5h" + note "amburgers".
+// Amount for d/h/m/s units: integer or decimal ("1.5h").
+#define ALARMQT_NUM R"((\d+(?:\.\d+)?))"
+
+// One optional "<n> unit" group per unit, in d/h/m/s order, each optionally
+// introduced by "and" ("1 hour and 30 minutes"). The lookahead keeps
+// "in 5 hamburgers" from matching as "in 5h" + note "amburgers".
+// Hours and minutes may carry a glued implicit next unit: "1h30" = 1h30m,
+// "2m30" = 2m30s (no space, so "in 5m 2 eggs" keeps its note).
+// Capture groups (6): d, h, implicit-min, m, implicit-sec, s.
 static const QString kDurationUnits = QStringLiteral(
-    R"((?:(\d+)\s*d(?:ays?)?(?![a-z]))?\s*)"
-    R"((?:(\d+)\s*h(?:ours?|rs?)?(?![a-z]))?\s*)"
-    R"((?:(\d+)\s*m(?:in(?:ute)?s?)?(?![a-z]))?\s*)"
-    R"((?:(\d+)\s*s(?:ec(?:ond)?s?)?(?![a-z]))?)");
-static const QString kDurationPattern = QStringLiteral(R"((?:in\s+)?)") + kDurationUnits;
+    R"((?:(?:and\s+)?)" ALARMQT_NUM R"(\s*d(?:ays?)?(?![a-z]))?\s*)"
+    R"((?:(?:and\s+)?)" ALARMQT_NUM R"(\s*h(?:ours?|rs?)?(?![a-z])(?:(\d{1,2})(?![\d.:a-z]))?)?\s*)"
+    R"((?:(?:and\s+)?)" ALARMQT_NUM R"(\s*m(?:in(?:ute)?s?)?(?![a-z])(?:(\d{1,2})(?![\d.:a-z]))?)?\s*)"
+    R"((?:(?:and\s+)?)" ALARMQT_NUM R"(\s*s(?:ec(?:ond)?s?)?(?![a-z]))?)");
+#undef ALARMQT_NUM
+
+// Calendar units ahead of kDurationUnits; integer only. Groups (4): years,
+// months, weeks, days (word form, added as calendar days for DST correctness).
+static const QString kCalendarUnits = QStringLiteral(
+    R"((?:(\d+)\s*years?(?![a-z]))?\s*)"
+    R"((?:(?:and\s+)?(\d+)\s*months?(?![a-z]))?\s*)"
+    R"((?:(?:and\s+)?(\d+)\s*weeks?(?![a-z]))?\s*)"
+    R"((?:(?:and\s+)?(\d+)\s*days?(?![a-z]))?\s*)");
+
+// Optional trailer on relative expressions: "in 5 minutes from now".
+static const QString kFromNow = QStringLiteral(R"((?:\s*from\s+now\b)?)");
+
+// Clock-style duration after "in": "in 5:10" (5h10m), "in 0:45:30" (h:mm:ss).
+// Only with "in" — a bare "5:10" is a time of day.
+static const QString kClockDuration = QStringLiteral(R"(\d{1,3}:\d{2}(?::\d{2})?(?![\d:.]))");
+
+// "a minute", "an hour", "an hour and a half", "half an hour", ...
+static const QString kWordDuration = QStringLiteral(
+    R"((?:an?|one)\s+hours?\s+and\s+a\s+half)"
+    R"(|(?:a\s+)?half(?:\s+an?)?\s+hours?)"
+    R"(|(?:a\s+)?quarters?\s+(?:of\s+an?\s+)?hours?)"
+    R"(|(?:a\s+)?fortnights?)"
+    R"(|an?\s+(?:second|sec|minute|min|hour|day|week|month|year)s?)");
+
+/**
+ * Wall-clock time inside a larger expression (no capture group, no trailing
+ * boundary): "15:10", "15:10:30", "15.10", "6:30pm", "6 p.m.", "0730",
+ * "noon", "midnight". A bare hour ("17") is not included — callers that
+ * accept it ("at 17") handle the whole string via parseTimeOfDay().
+ */
+static const QString kClockTime = QStringLiteral(
+    R"((?:\d{1,2}(?::\d{2}(?::\d{2})?|\.\d{2})(?:\s*[ap]\.?m\.?)?)"
+    R"(|\d{1,2}\s*[ap]\.?m\.?)"
+    R"(|\d{4}(?![\d:.]|-\d{2}-))"
+    R"(|noon|midnight))");
+
+// kClockTime (+ eod) as capture group with a word boundary, for weekday /
+// today / recurring forms.
+static const QString kTimeCapture =
+    QStringLiteral("(") + kClockTime + QStringLiteral(R"(|eod)(?![\w:]))");
 
 // Upper bound for relative alarms; also keeps the arithmetic below in range.
 static constexpr qint64 kMaxRelativeSecs = 100LL * 366 * 86400;
 
 /**
- * Seconds of a kDurationUnits match whose d/h/m/s groups start at `firstGroup`.
- * Returns -1 for no match, no unit given, or a duration out of range.
+ * Seconds of a kDurationUnits match whose groups start at `firstGroup`.
+ * Returns -1 for no match, no unit given, conflicting/invalid parts or a
+ * duration out of range.
  */
 static qint64 durationSecs(const QRegularExpressionMatch& m, int firstGroup) {
     if (!m.hasMatch())
         return -1;
-    static constexpr qint64 kUnitSecs[] = {86400, 3600, 60, 1};
-    qint64 secs = 0;
+    auto cap = [&](int i) { return m.captured(firstGroup + i); };
+    // Implicit minute/second only after an integer amount, never together
+    // with an explicit one ("1h30 5m"), and below 60.
+    for (const int impl : {2, 4}) {
+        if (cap(impl).isEmpty())
+            continue;
+        if (!cap(impl + 1).isEmpty() || cap(impl - 1).contains(QLatin1Char('.'))
+            || cap(impl).toInt() >= 60)
+            return -1;
+    }
+    static constexpr qint64 kUnitSecs[] = {86400, 3600, 60, 60, 1, 1};
+    double secs = 0;
     bool any = false;
-    for (int i = 0; i < 4; ++i) {
-        const QString digits = m.captured(firstGroup + i);
+    for (int i = 0; i < 6; ++i) {
+        const QString digits = cap(i);
         if (digits.isEmpty())
             continue;
         any = true;
         bool ok = false;
-        const qint64 n = digits.toLongLong(&ok);
-        if (!ok || n > kMaxRelativeSecs / kUnitSecs[i])
+        const double n = digits.toDouble(&ok);
+        if (!ok || n > double(kMaxRelativeSecs / kUnitSecs[i]))
             return -1;
-        secs += n * kUnitSecs[i];
+        secs += n * double(kUnitSecs[i]);
     }
-    if (!any || secs <= 0 || secs > kMaxRelativeSecs)
+    const qint64 total = std::llround(secs);
+    if (!any || total <= 0 || total > kMaxRelativeSecs)
         return -1;
-    return secs;
+    return total;
 }
 
 static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     QString t = s.trimmed();
     // Optional leading "in "
-    if (t.startsWith(QLatin1String("in "), Qt::CaseInsensitive))
+    bool hadIn = false;
+    if (t.startsWith(QLatin1String("in "), Qt::CaseInsensitive)) {
         t = t.mid(3).trimmed();
+        hadIn = true;
+    }
+    // Optional trailing "from now"
+    static const QRegularExpression fromNow(
+        QStringLiteral(R"(\s+from\s+now\z)"), QRegularExpression::CaseInsensitiveOption);
+    t.remove(fromNow);
+
+    // Clock style "in H:MM" / "in H:MM:SS"
+    static const QRegularExpression clock(
+        QStringLiteral(R"(\A(\d{1,3}):(\d{2})(?::(\d{2}))?\z)"));
+    if (const auto m = clock.match(t); m.hasMatch()) {
+        if (!hadIn)
+            return {};
+        const int h = m.captured(1).toInt();
+        const int min = m.captured(2).toInt();
+        const int sec = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
+        const qint64 total = qint64(h) * 3600 + min * 60 + sec;
+        if (min > 59 || sec > 59 || total <= 0)
+            return {};
+        return nowLocal.addSecs(total);
+    }
 
     // Synonyms (whole string after optional "in")
+    static const QRegularExpression hourAndHalf(
+        QStringLiteral(R"(\A(?:an?|one)\s+hours?\s+and\s+a\s+half\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (hourAndHalf.match(t).hasMatch())
+        return nowLocal.addSecs(90 * 60);
+
     static const QRegularExpression halfHour(
         QStringLiteral(R"(\A(?:a\s+)?half(?:\s+an?)?\s+hours?\s*\z)"),
         QRegularExpression::CaseInsensitiveOption);
@@ -93,72 +182,72 @@ static QDateTime parseRelative(const QString& s, const QDateTime& nowLocal) {
     if (quarterHour.match(t).hasMatch())
         return nowLocal.addSecs(15 * 60);
 
-    static const QRegularExpression anHour(
-        QStringLiteral(R"(\Aan?\s+hours?\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
-    if (anHour.match(t).hasMatch())
-        return nowLocal.addSecs(3600);
-
     static const QRegularExpression fortnight(
         QStringLiteral(R"(\A(?:a\s+)?fortnights?\s*\z)"),
         QRegularExpression::CaseInsensitiveOption);
     if (fortnight.match(t).hasMatch())
         return nowLocal.addDays(14);
 
+    // "a minute", "an hour", "a day", "a week", "a month", "a year"
+    static const QRegularExpression oneUnit(
+        QStringLiteral(R"(\Aan?\s+(second|sec|minute|min|hour|day|week|month|year)s?\s*\z)"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (const auto m = oneUnit.match(t); m.hasMatch()) {
+        const QString u = m.captured(1).toLower();
+        if (u.startsWith(QLatin1String("sec")))
+            return nowLocal.addSecs(1);
+        if (u.startsWith(QLatin1String("min")))
+            return nowLocal.addSecs(60);
+        if (u == QLatin1String("hour"))
+            return nowLocal.addSecs(3600);
+        if (u == QLatin1String("day"))
+            return nowLocal.addDays(1);
+        if (u == QLatin1String("week"))
+            return nowLocal.addDays(7);
+        if (u == QLatin1String("month"))
+            return nowLocal.addMonths(1);
+        return nowLocal.addYears(1);
+    }
+
     // Combined: [N years] [N months] [N weeks] [N days] [d/h/m/s pattern]
-    // Also accepts pure "2 weeks", "1 year 2 months", "2 weeks 3 days", "1h30m".
+    // Also accepts pure "2 weeks", "1 year 2 months", "2 weeks 3 days", "1h30m",
+    // "1.5h", "1h30", "1 hour and 30 minutes".
     static const QRegularExpression combined(
-        QStringLiteral(
-            R"(\A(?:(\d+)\s*years?)?\s*(?:(\d+)\s*months?)?\s*(?:(\d+)\s*weeks?)?\s*)"
-            R"((?:(\d+)\s*days?)?\s*)") + kDurationUnits + QStringLiteral(R"(\s*\z)"),
+        QStringLiteral(R"(\A)") + kCalendarUnits + kDurationUnits + QStringLiteral(R"(\s*\z)"),
         QRegularExpression::CaseInsensitiveOption);
     if (const auto m = combined.match(t); m.hasMatch()) {
+        // Groups 1–4 = years/months/weeks/days, 5–10 = kDurationUnits.
         bool any = false;
         QDateTime out = nowLocal;
-        auto take = [&](int group, auto apply) {
+        auto take = [&](int group, qint64 limit, auto apply) {
             if (m.captured(group).isEmpty())
-                return;
+                return true;
             bool ok = false;
-            const int n = m.captured(group).toInt(&ok);
-            if (!ok || n <= 0)
-                return;
-            apply(n);
+            const qint64 n = m.captured(group).toLongLong(&ok);
+            if (!ok || n <= 0 || n > limit)
+                return false;
+            apply(int(n));
             any = true;
+            return true;
         };
-        take(1, [&](int n) {
-            if (n <= 100)
-                out = out.addYears(n);
-        });
-        take(2, [&](int n) {
-            if (n <= 1200)
-                out = out.addMonths(n);
-        });
-        take(3, [&](int n) {
-            if (n <= kMaxRelativeSecs / (7 * 86400))
-                out = out.addDays(n * 7);
-        });
-        take(4, [&](int n) {
-            if (n <= kMaxRelativeSecs / 86400)
-                out = out.addDays(n);
-        });
-        // groups 5–8 = d/h/m/s from kDurationUnits (may double-count "days" if
-        // both "3 days" and "3d" — prefer the word form above; units start at 5)
-        const qint64 unitSecs = durationSecs(m, 5);
-        if (unitSecs > 0) {
+        if (!take(1, 100, [&](int n) { out = out.addYears(n); })
+            || !take(2, 1200, [&](int n) { out = out.addMonths(n); })
+            || !take(3, kMaxRelativeSecs / (7 * 86400), [&](int n) { out = out.addDays(n * 7LL); })
+            || !take(4, kMaxRelativeSecs / 86400, [&](int n) { out = out.addDays(n); }))
+            return {};
+        bool unitsGiven = false;
+        for (int g = 5; g <= 10; ++g)
+            unitsGiven = unitsGiven || !m.captured(g).isEmpty();
+        if (unitsGiven) {
+            const qint64 unitSecs = durationSecs(m, 5);
+            if (unitSecs <= 0)
+                return {};
             out = out.addSecs(unitSecs);
             any = true;
         }
         if (any)
             return out;
     }
-
-    // Fallback: classic d/h/m/s only with optional "in" already stripped
-    static const QRegularExpression unitsOnly(
-        QStringLiteral(R"(\A)") + kDurationUnits + QStringLiteral(R"(\s*\z)"),
-        QRegularExpression::CaseInsensitiveOption);
-    const qint64 secs = durationSecs(unitsOnly.match(t), 1);
-    if (secs > 0)
-        return nowLocal.addSecs(secs);
 
     return {};
 }
@@ -240,7 +329,10 @@ static bool peelGluedZone(QString* text, QTimeZone* zone) {
     return true;
 }
 
-/** Wall-clock time: 24h "15:10[:00]" or American 12-hour "6:00am", "6 PM", "12am". */
+/**
+ * Wall-clock time: 24h "15:10[:00]", "15.10", "0730", bare hour "17", or
+ * American 12-hour "6:00am", "6 PM", "3.30 p.m.", "12am".
+ */
 static QTime parseTimeOfDay(const QString& text) {
     const QString t = text.trimmed();
     if (t.compare(QLatin1String("noon"), Qt::CaseInsensitive) == 0)
@@ -251,38 +343,37 @@ static QTime parseTimeOfDay(const QString& text) {
         || t.compare(QLatin1String("end of day"), Qt::CaseInsensitive) == 0)
         return QTime(23, 59);
 
-    // Bare hour: "5" or "17" (callers require leading "at" to disambiguate)
-    static const QRegularExpression bareHour(QStringLiteral(R"(\A(\d{1,2})\z)"));
-    if (const auto bh = bareHour.match(t); bh.hasMatch()) {
-        const int hour = bh.captured(1).toInt();
-        if (hour >= 0 && hour <= 23)
-            return QTime(hour, 0);
-        return {};
+    // Four digits "0730" / "1510" (24h, no separator)
+    static const QRegularExpression fourDigits(QStringLiteral(R"(\A(\d{2})(\d{2})\z)"));
+    if (const auto m = fourDigits.match(t); m.hasMatch()) {
+        const int hour = m.captured(1).toInt();
+        const int minute = m.captured(2).toInt();
+        if (hour > 23 || minute > 59)
+            return {};
+        return QTime(hour, minute);
     }
 
-    QTime time = QTime::fromString(t, QStringLiteral("HH:mm:ss"));
-    if (!time.isValid())
-        time = QTime::fromString(t, QStringLiteral("HH:mm"));
-    if (!time.isValid())
-        time = QTime::fromString(t, QStringLiteral("H:mm:ss"));
-    if (!time.isValid())
-        time = QTime::fromString(t, QStringLiteral("H:mm"));
-    if (time.isValid())
-        return time;
-
-    QString norm = t;
-    norm.replace(QLatin1Char('.'), QString());
-    static const QRegularExpression amPmRe(
-        R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap])m\z)",
+    // H[:MM[:SS]] or H.MM, optional am/pm. Bare hour "5" / "17" is 24h
+    // (callers require leading "at" to disambiguate).
+    static const QRegularExpression clockRe(
+        QStringLiteral(R"(\A(\d{1,2})(?::(\d{2})(?::(\d{2}))?|\.(\d{2}))?(?:\s*([ap])\.?m\.?)?\z)"),
         QRegularExpression::CaseInsensitiveOption);
-    const auto m = amPmRe.match(norm.trimmed());
+    const auto m = clockRe.match(t);
     if (!m.hasMatch())
         return {};
     int hour = m.captured(1).toInt();
-    const int minute = m.captured(2).isEmpty() ? 0 : m.captured(2).toInt();
+    const QString minStr = m.captured(2).isEmpty() ? m.captured(4) : m.captured(2);
+    const int minute = minStr.isEmpty() ? 0 : minStr.toInt();
     const int second = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
-    const bool pm = m.captured(4).compare(QLatin1String("p"), Qt::CaseInsensitive) == 0;
-    if (hour < 1 || hour > 12 || minute > 59 || second > 59)
+    if (minute > 59 || second > 59)
+        return {};
+    if (m.captured(5).isEmpty()) {
+        if (hour > 23)
+            return {};
+        return QTime(hour, minute, second);
+    }
+    const bool pm = m.captured(5).compare(QLatin1String("p"), Qt::CaseInsensitive) == 0;
+    if (hour < 1 || hour > 12)
         return {};
     if (pm && hour < 12)
         hour += 12;
@@ -375,8 +466,7 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
     static const QString kDay = QStringLiteral(
         R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
         R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
-    static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
+    static const QString& kTime = kTimeCapture;
 
     static const QRegularExpression weeklyRe(
         QStringLiteral(R"(\A(?:(?:every|each)\s+()") + kDay
@@ -533,8 +623,7 @@ static bool parseRecurring(const QString& input, QString* timePart, QString* not
  */
 static bool parseTodayTomorrow(const QString& input, QString* timePart, QString* note,
                                QDateTime* triggerLocal, const QDateTime& nowLocal) {
-    static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
+    static const QString& kTime = kTimeCapture;
     static const QRegularExpression re(
         QStringLiteral(R"(\A(today|tomorrow)\s*,?\s*(?:at\s+)?)") + kTime,
         QRegularExpression::CaseInsensitiveOption);
@@ -572,8 +661,7 @@ static bool parseNextWeekday(const QString& input, QString* timePart, QString* n
     static const QString kDay = QStringLiteral(
         R"((?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?)"
         R"(|fri(?:day)?|sat(?:urday)?|sun(?:day)?|weekdays?|weekends?|day)s?\b)");
-    static const QString kTime = QStringLiteral(
-        R"((\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight|eod)(?![\w:]))");
+    static const QString& kTime = kTimeCapture;
     const QTimeZone zone = nowLocal.timeZone();
 
     // next week <weekday> [at] <time>
@@ -683,66 +771,51 @@ static void splitTimeAndNote(const QString& input, QString* timePart, QString* n
         return;
     }
 
-    // 3) Relative duration prefix + trailing words: "in 5s kitchen"
+    // 3) Relative duration prefix + trailing words: "in 5s kitchen",
+    // "in 2 weeks and 3 days walk", "in 1h30 tea", "in 5:10 tea",
+    // "in an hour and a half call mom"
+    auto takePrefix = [&](const QRegularExpressionMatch& m) {
+        const QString rest = trimmed.mid(m.capturedLength(0)).trimmed();
+        if (rest.isEmpty())
+            return false;
+        *timePart = m.captured(1).trimmed();
+        *note = rest;
+        return true;
+    };
     static const QRegularExpression relPrefix(
-        QStringLiteral(R"(\A()") + kDurationPattern + QStringLiteral(")"),
+        QStringLiteral(R"(\A((?:in\s+)?)") + kCalendarUnits + kDurationUnits + kFromNow
+            + QStringLiteral(")"),
         QRegularExpression::CaseInsensitiveOption);
     if (auto rm = relPrefix.match(trimmed); rm.hasMatch()) {
-        const QString prefix = rm.captured(1).trimmed();
-        // Must include at least one digit+unit (reject empty / "in" alone)
+        // Must include at least one number + unit (reject empty / "in" alone)
         static const QRegularExpression hasUnit(
-            R"(\d+\s*[dhms])", QRegularExpression::CaseInsensitiveOption);
-        if (hasUnit.match(prefix).hasMatch()) {
-            const QString rest = trimmed.mid(rm.capturedLength(0)).trimmed();
-            if (!rest.isEmpty()) {
-                *timePart = prefix;
-                *note = rest;
-                return;
-            }
-        }
-    }
-    static const QRegularExpression weekMonthYearPrefix(
-        QStringLiteral(
-            R"(\A((?:in\s+)?(?:\d+\s*(?:years?|months?|weeks?|days?)\s*)+|(?:in\s+)?\d+\s*(?:weeks?|months?|years?))\b)"),
-        QRegularExpression::CaseInsensitiveOption);
-    if (auto wm = weekMonthYearPrefix.match(trimmed); wm.hasMatch()) {
-        const QString rest = trimmed.mid(wm.capturedLength(0)).trimmed();
-        if (!rest.isEmpty()) {
-            *timePart = wm.captured(1).trimmed();
-            *note = rest;
+            R"(\d\s*[a-z])", QRegularExpression::CaseInsensitiveOption);
+        if (hasUnit.match(rm.captured(1)).hasMatch() && takePrefix(rm))
             return;
-        }
     }
+    static const QRegularExpression clockPrefix(
+        QStringLiteral(R"(\A(in\s+)") + kClockDuration + kFromNow + QStringLiteral(")"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (auto cm = clockPrefix.match(trimmed); cm.hasMatch() && takePrefix(cm))
+        return;
     static const QRegularExpression synonymPrefix(
-        QStringLiteral(
-            R"(\A((?:in\s+)?(?:(?:a\s+)?half(?:\s+an?)?\s+hours?|(?:a\s+)?quarters?\s+(?:of\s+an?\s+)?hours?|an?\s+hours?|(?:a\s+)?fortnights?))\b)"),
+        QStringLiteral(R"(\A((?:in\s+)?(?:)") + kWordDuration + QStringLiteral(R"()\b)") + kFromNow
+            + QStringLiteral(")"),
         QRegularExpression::CaseInsensitiveOption);
-    if (auto sp = synonymPrefix.match(trimmed); sp.hasMatch()) {
-        const QString rest = trimmed.mid(sp.capturedLength(0)).trimmed();
-        if (!rest.isEmpty()) {
-            *timePart = sp.captured(1).trimmed();
-            *note = rest;
-            return;
-        }
-    }
+    if (auto sp = synonymPrefix.match(trimmed); sp.hasMatch() && takePrefix(sp))
+        return;
 
     // 4) Absolute time prefix (+ optional glued zone) + trailing words:
-    // "at 15:10 meeting" / "at 15:10CEST standup"
+    // "at 15:10 meeting" / "at 15:10CEST standup" / "at 0730 gym"
     static const QRegularExpression absPrefix(
         // The zone must follow the time directly, so "15:10 CEST" stays a label;
-        // only am/pm may be separated by a space.
-        QStringLiteral(R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T](?:\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight)|\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?|\d{1,2}\s*[ap]\.?m\.?|noon|midnight))")
-        + kGluedZoneSuffix + QStringLiteral(R"(?))"),
+        // only am/pm may be separated by a space. The time must end at a space
+        // so "1.25h" is not read as 1:25 + note "h".
+        QStringLiteral(R"(\A((?:at\s+)?(?:\d{4}-\d{2}-\d{2}[ T])?)") + kClockTime
+            + kGluedZoneSuffix + QStringLiteral(R"(?)(?=\s|\z))"),
         QRegularExpression::CaseInsensitiveOption);
-    if (auto am = absPrefix.match(trimmed); am.hasMatch()) {
-        const QString prefix = am.captured(1).trimmed();
-        const QString rest = trimmed.mid(am.capturedLength(0)).trimmed();
-        if (!rest.isEmpty()) {
-            *timePart = prefix;
-            *note = rest;
-            return;
-        }
-    }
+    if (auto am = absPrefix.match(trimmed); am.hasMatch())
+        takePrefix(am);
 }
 
 /** Consume leading modifier keywords (style / disabled). Case-insensitive.
@@ -807,9 +880,12 @@ std::optional<Alarm> AlarmManager::parse(const QString& input, const QString& la
         // one-shot [next] <weekday> [at] <time>
     } else {
         splitTimeAndNote(trimmed, &timePart, &note);
-        if (timePart.contains(QRegularExpression(
-                R"(\bin\b|\d+\s*(?:[dhms]|weeks?|months?|years?|days?)|half|quarter|fortnight)",
-                QRegularExpression::CaseInsensitiveOption))) {
+        static const QRegularExpression looksRelative(
+            QStringLiteral(
+                R"(\bin\b|\d\s*(?:[dhms]|weeks?|months?|years?|days?)|half|quarter|fortnight)"
+                R"(|\ban?\s+(?:sec|min|hour|day|week|month|year))"),
+            QRegularExpression::CaseInsensitiveOption);
+        if (timePart.contains(looksRelative)) {
             // Prefer relative if it looks like one
             triggerLocal = parseRelative(timePart, nowLocal);
         }

@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Notification shows live now time + overdue
+- **Current tip:** Tolerant time parsing (clock durations, decimals, dot / 4-digit times)
 - **Next bundle NNN:** 050
 
 ## Status
@@ -16,6 +16,13 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 - [ ] Shell completions (bash/zsh/fish)
 
 ## Done recently
+
+- Tolerant time parsing: `in 5:10` / `in 5:10:00` (h:mm[:ss], only after `in`),
+  decimals (`in 1.5h`), glued implicit unit (`in 1h30`, `in 2m30`), `and`
+  between units, `in a minute` / `a day` / `a week` / `an hour and a half`,
+  trailing `from now`; absolute `at 15.10`, `at 3.30pm`, `at 0730` (also in
+  today/weekday/recurring forms); `every 1:30` stays rejected (ambiguous);
+  out-of-range calendar amounts (`in 200 years`) now fail instead of being ignored
 
 - Notification dialog shows live local **Now** time and **Overdue by** duration
   (seconds/minutes/hours past scheduled time), updated every second; Standard,
