@@ -55,8 +55,9 @@ constexpr auto kNotifyMuteKey = "notification/muted";
 constexpr auto kNotifyVolumeKey = "notification/volume";
 
 /** Confirm a destructive action with Cancel + Delete.
- *  QDialogButtonBox roles drive platform order (GNOME: Cancel then Delete).
- *  Cancel is default and Escape target. */
+ *  Fixed GNOME 2 HIG order regardless of platform style: Cancel on the
+ *  left, the affirmative Delete on the right as the default button
+ *  (Enter deletes). Escape still cancels. */
 bool confirmDelete(QWidget* parent, const QString& title, const QString& text)
 {
     QDialog dlg(parent);
@@ -78,16 +79,24 @@ bool confirmDelete(QWidget* parent, const QString& title, const QString& text)
     row->addWidget(label, 1);
     root->addLayout(row);
 
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
-    auto* deleteBtn = buttons->addButton(QObject::tr("Delete"), QDialogButtonBox::DestructiveRole);
-    if (auto* cancelBtn = buttons->button(QDialogButtonBox::Cancel)) {
-        cancelBtn->setDefault(true);
-        cancelBtn->setAutoDefault(true);
-    }
-    root->addWidget(buttons);
+    // Plain layout instead of QDialogButtonBox, which would reorder the
+    // buttons per platform (e.g. KDE puts the affirmative button first).
+    auto* buttons = new QHBoxLayout;
+    buttons->addStretch(1);
+    auto* cancelBtn = new QPushButton(
+        QIcon::fromTheme(QStringLiteral("dialog-cancel")), QObject::tr("Cancel"));
+    auto* deleteBtn = new QPushButton(
+        QIcon::fromTheme(QStringLiteral("edit-delete")), QObject::tr("Delete"));
+    cancelBtn->setAutoDefault(false);
+    deleteBtn->setAutoDefault(true);
+    deleteBtn->setDefault(true);
+    buttons->addWidget(cancelBtn);
+    buttons->addWidget(deleteBtn);
+    root->addLayout(buttons);
 
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    QObject::connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
     QObject::connect(deleteBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    deleteBtn->setFocus();
 
     return dlg.exec() == QDialog::Accepted;
 }
