@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Tray notifications use the app logo instead of the warning icon
+- **Current tip:** Desktop notifications via org.freedesktop.Notifications with app logo
 - **Next bundle NNN:** 050
 
 ## Status
@@ -17,8 +17,11 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
-- Tray / desktop notifications show the AlarmQt logo (`alarm.svg`) instead of
-  the generic warning symbol (single `MainWindow::showTrayMessage` helper)
+- Desktop notifications go straight to `org.freedesktop.Notifications`
+  (`app_icon=alarmqt`, `image-data` fallback when the icon is not installed,
+  `desktop-entry` hint) so the AlarmQt logo shows instead of the warning symbol;
+  Qt's tray balloon only as fallback (Qt's D-Bus tray drops custom icons).
+  Notify-only alarms no longer post the notification twice
 - Tolerant time parsing: `in 5:10` / `in 5:10:00` (h:mm[:ss], only after `in`),
   decimals (`in 1.5h`), glued implicit unit (`in 1h30`, `in 2m30`), `and`
   between units, `in a minute` / `a day` / `a week` / `an hour and a half`,

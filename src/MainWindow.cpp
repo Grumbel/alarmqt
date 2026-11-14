@@ -38,6 +38,14 @@
 #include <QActionGroup>
 #include <QSettings>
 #include <QAction>
+#include <QDBusArgument>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+#include <QImage>
+#include <QStandardPaths>
 
 #include <algorithm>
 
@@ -1232,12 +1240,65 @@ void MainWindow::renotifyTriggered() {
 }
 
 void MainWindow::showTrayMessage(const QString& title, const QString& text, int msecs) {
-    if (!m_tray)
+    // Talk to the freedesktop notification server directly: Qt's D-Bus tray
+    // backend drops custom QIcons, so the app logo would never show up.
+    static const QString service = QStringLiteral("org.freedesktop.Notifications");
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected() || !bus.interface()
+        || !bus.interface()->isServiceRegistered(service)) {
+        showTrayBalloon(title, text, msecs);
         return;
-    // App logo instead of the generic warning symbol; desktop notification
-    // servers receive it as image data.
-    const QIcon logo(QStringLiteral(":/icons/alarm.svg"));
-    m_tray->showMessage(title, text, logo, msecs);
+    }
+
+    QVariantMap hints;
+    hints.insert(QStringLiteral("desktop-entry"), QGuiApplication::desktopFileName());
+    hints.insert(QStringLiteral("urgency"), QVariant::fromValue(uchar(1)));
+
+    // Prefer the installed icon by name (same as `notify-send -i alarmqt`);
+    // uninstalled builds send the embedded logo as raw image data. Look the
+    // file up directly: Qt's icon theme may not be set up (e.g. no platform
+    // theme), while the notification server resolves the name itself.
+    QString appIcon;
+    if (!QStandardPaths::locate(QStandardPaths::GenericDataLocation,
+                                QStringLiteral("icons/hicolor/scalable/apps/alarmqt.svg"))
+             .isEmpty()) {
+        appIcon = QStringLiteral("alarmqt");
+    } else {
+        const QImage img = QIcon(QStringLiteral(":/icons/alarm.svg"))
+                               .pixmap(QSize(64, 64))
+                               .toImage()
+                               .convertToFormat(QImage::Format_RGBA8888);
+        QDBusArgument arg;
+        arg.beginStructure();
+        arg << img.width() << img.height() << int(img.bytesPerLine()) << true << 8 << 4
+            << QByteArray(reinterpret_cast<const char*>(img.constBits()),
+                          qsizetype(img.sizeInBytes()));
+        arg.endStructure();
+        hints.insert(QStringLiteral("image-data"), QVariant::fromValue(arg));
+    }
+
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        service, QStringLiteral("/org/freedesktop/Notifications"), service,
+        QStringLiteral("Notify"));
+    msg << QStringLiteral("AlarmQt") << uint(0) << appIcon << title << text
+        << QStringList() << hints << msecs;
+
+    auto* watcher = new QDBusPendingCallWatcher(bus.asyncCall(msg), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, title, text, msecs](QDBusPendingCallWatcher* w) {
+                const QDBusPendingReply<uint> reply = *w;
+                if (reply.isError()) {
+                    qWarning("Desktop notification failed: %s",
+                             qPrintable(reply.error().message()));
+                    showTrayBalloon(title, text, msecs);
+                }
+                w->deleteLater();
+            });
+}
+
+void MainWindow::showTrayBalloon(const QString& title, const QString& text, int msecs) {
+    if (m_tray)
+        m_tray->showMessage(title, text, QIcon(QStringLiteral(":/icons/alarm.svg")), msecs);
 }
 
 void MainWindow::showNotification(const Alarm& a) {
@@ -1249,12 +1310,11 @@ void MainWindow::showNotification(const Alarm& a) {
 
     const NotificationStyle style = a.notificationStyle.value_or(currentNotificationStyle());
 
-    // Tray-only: no dialog; leave alarm triggered so the list / renotify can
-    // still surface it until the user acknowledges from the main window.
-    if (style == NotificationStyle::NotifyOnly) {
-        showTrayMessage(tr("Alarm"), a.displayName(), 10'000);
+    // Tray-only: no dialog; the callers already post the desktop notification.
+    // Leave the alarm triggered so the list / renotify can still surface it
+    // until the user acknowledges from the main window.
+    if (style == NotificationStyle::NotifyOnly)
         return;
-    }
 
     // Silent uses Standard visuals (side blinkers) with volume forced to 0.
     NotificationStyle dialogStyle = style;
