@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Tolerant time parsing (clock durations, decimals, dot / 4-digit times)
+- **Current tip:** Tray notifications use the app logo instead of the warning icon
 - **Next bundle NNN:** 050
 
 ## Status
@@ -17,6 +17,8 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Tray / desktop notifications show the AlarmQt logo (`alarm.svg`) instead of
+  the generic warning symbol (single `MainWindow::showTrayMessage` helper)
 - Tolerant time parsing: `in 5:10` / `in 5:10:00` (h:mm[:ss], only after `in`),
   decimals (`in 1.5h`), glued implicit unit (`in 1h30`, `in 2m30`), `and`
   between units, `in a minute` / `a day` / `a week` / `an hour and a half`,

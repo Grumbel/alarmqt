@@ -1211,7 +1211,7 @@ void MainWindow::updateTray() {
 void MainWindow::onAlarmTriggered(const Alarm& a) {
     m_activeTriggered.insert(a.id);
     showNotification(a);
-    m_tray->showMessage(tr("Alarm"), a.displayName(), QSystemTrayIcon::Warning, 10'000);
+    showTrayMessage(tr("Alarm"), a.displayName(), 10'000);
 }
 
 void MainWindow::renotifyTriggered() {
@@ -1227,9 +1227,17 @@ void MainWindow::renotifyTriggered() {
             continue;
         }
         showNotification(*a);
-        m_tray->showMessage(tr("Alarm (still active)"), a->displayName(),
-                            QSystemTrayIcon::Warning, 8'000);
+        showTrayMessage(tr("Alarm (still active)"), a->displayName(), 8'000);
     }
+}
+
+void MainWindow::showTrayMessage(const QString& title, const QString& text, int msecs) {
+    if (!m_tray)
+        return;
+    // App logo instead of the generic warning symbol; desktop notification
+    // servers receive it as image data.
+    const QIcon logo(QStringLiteral(":/icons/alarm.svg"));
+    m_tray->showMessage(title, text, logo, msecs);
 }
 
 void MainWindow::showNotification(const Alarm& a) {
@@ -1244,9 +1252,7 @@ void MainWindow::showNotification(const Alarm& a) {
     // Tray-only: no dialog; leave alarm triggered so the list / renotify can
     // still surface it until the user acknowledges from the main window.
     if (style == NotificationStyle::NotifyOnly) {
-        if (m_tray)
-            m_tray->showMessage(tr("Alarm"), a.displayName(),
-                                QSystemTrayIcon::Warning, 10'000);
+        showTrayMessage(tr("Alarm"), a.displayName(), 10'000);
         return;
     }
 

@@ -60,6 +60,7 @@ private:
     void createTray();
     void createMenus();
     void showNotification(const Alarm& a);
+    void showTrayMessage(const QString& title, const QString& text, int msecs);
     bool editAlarm(const QUuid& id);
     /** Run a mutating action under the undo stack (snapshot before/after). */
     void withUndo(const QString& text, const std::function<void()>& action);
