@@ -3,15 +3,13 @@
 
 #include "MainWindow.h"
 
+#include "EditAlarmDialog.h"
+
 #include <QApplication>
 #include <QCloseEvent>
 #include <QResizeEvent>
-#include <QDateTimeEdit>
 #include <QDialog>
 #include <QDialogButtonBox>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QFormLayout>
 #include <QHeaderView>
 #include <QItemSelection>
 #include <QKeyEvent>
@@ -958,127 +956,32 @@ bool MainWindow::editAlarm(const QUuid& id) {
     if (!current)
         return false;
     const Alarm original = *current;
-    const Alarm* a = &original;
 
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Edit alarm"));
-    auto* form = new QFormLayout(&dlg);
-
-    auto* commandEdit = new QLineEdit(a->command);
-    commandEdit->setPlaceholderText(tr("in 5m  ·  at 15:10"));
-    auto* labelEdit = new QLineEdit(a->label);
-    labelEdit->setPlaceholderText(tr("optional note"));
-    const QDateTime editWhen = a->scheduledUtc.isValid() ? a->scheduledUtc : a->triggerUtc;
-    auto* whenEdit = new QDateTimeEdit(editWhen.toLocalTime());
-    whenEdit->setCalendarPopup(true);
-    whenEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
-    whenEdit->setTimeZone(QTimeZone::systemTimeZone());
-
-    auto* doneCheck = new QCheckBox(tr("Done (acknowledged)"));
-    doneCheck->setChecked(a->acknowledged);
-    if (a->recurrence.isRecurring()) {
-        // Repeating alarms never become DONE; use "Skip next" instead.
-        doneCheck->setEnabled(false);
-        doneCheck->setToolTip(tr("Repeating alarm (%1); use Skip next or Remove")
-                                  .arg(a->recurrence.describe()));
-    }
-
-    form->addRow(tr("Command"), commandEdit);
-    form->addRow(tr("Label"), labelEdit);
-    form->addRow(tr("When"), whenEdit);
-    form->addRow(QString(), doneCheck);
-
-    auto* styleCombo = new QComboBox;
-    // itemData: -1 = app default; else NotificationStyle int
-    styleCombo->addItem(tr("Default (Settings)"), -1);
-    styleCombo->addItem(tr("Standard (side blinkers)"), int(NotificationStyle::Standard));
-    styleCombo->addItem(tr("Simple (no side blinkers)"), int(NotificationStyle::Simple));
-    styleCombo->addItem(tr("Fullscreen flash"), int(NotificationStyle::Fullscreen));
-    styleCombo->addItem(tr("Silent (blink only)"), int(NotificationStyle::Silent));
-    styleCombo->addItem(tr("Notification only (tray)"), int(NotificationStyle::NotifyOnly));
-    if (a->notificationStyle) {
-        const int idx = styleCombo->findData(int(*a->notificationStyle));
-        if (idx >= 0)
-            styleCombo->setCurrentIndex(idx);
-    } else {
-        styleCombo->setCurrentIndex(0); // Default
-    }
-    form->addRow(tr("Notification style"), styleCombo);
-
-    auto* applyCmdBtn = new QPushButton(tr("Apply command → When"));
-    form->addRow(QString(), applyCmdBtn);
-    QObject::connect(applyCmdBtn, &QPushButton::clicked, &dlg, [this, commandEdit, labelEdit, whenEdit, &dlg]() {
-        const QString cmd = commandEdit->text().trimmed();
-        auto opt = AlarmManager::parse(cmd, labelEdit->text().trimmed());
-        if (!opt) {
-            QMessageBox::warning(&dlg, tr("Parse error"),
-                                 tr("Could not parse command: %1").arg(cmd));
-            return;
-        }
-        whenEdit->setDateTime(opt->triggerUtc.toLocalTime());
-        if (!opt->command.isEmpty())
-            commandEdit->setText(opt->command);
-    });
-
-    // Standard roles: QDialogButtonBox lays out Cancel/Ok in platform order
-    // (GNOME Cancel|Ok, Windows Ok|Cancel, etc.).
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Ok);
-    form->addRow(buttons);
-    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
+    EditAlarmDialog dlg(original, this);
     if (dlg.exec() != QDialog::Accepted)
         return false;
 
-    // Pick up state changes made while the dialog was open (fired, snoozed, ...)
+    // Apply on top of changes made while the dialog was open (fired, snoozed, ...)
     const Alarm* latest = m_manager->alarmById(id);
     if (!latest)
         return false; // removed meanwhile
-    Alarm updated = *latest;
-    const QString newCmd = commandEdit->text().trimmed();
-    updated.command = newCmd;
-    updated.label = labelEdit->text().trimmed();
-
-    // If command changed, re-parse into trigger; else keep When field
-    if (newCmd != a->command && !newCmd.isEmpty()) {
-        auto opt = AlarmManager::parse(newCmd, updated.label);
-        if (opt) {
-            updated.command = opt->command.isEmpty() ? newCmd : opt->command;
-            updated.recurrence = opt->recurrence;
-            updated.triggerUtc = opt->triggerUtc;
-            const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
-            while (updated.triggerUtc <= nowUtc)
-                updated.triggerUtc = updated.triggerUtc.addDays(1);
-        } else {
-            QDateTime local = whenEdit->dateTime();
-            local.setTimeZone(QTimeZone::systemTimeZone());
-            updated.triggerUtc = local.toUTC();
-        }
-    } else {
-        QDateTime local = whenEdit->dateTime();
-        local.setTimeZone(QTimeZone::systemTimeZone());
-        updated.triggerUtc = local.toUTC();
+    const Alarm before = *latest;
+    const AlarmEditOutcome outcome = applyAlarmEdit(before, original.command, dlg.edit());
+    if (!outcome.alarm) {
+        QMessageBox::warning(this, tr("Edit alarm"), outcome.error);
+        return false;
     }
+    const Alarm updated = *outcome.alarm;
+    if (updated == before)
+        return true; // nothing changed; no undo entry
 
-    // An unparsable new command keeps the old rule rather than silently
-    // dropping it; a repeating alarm is never DONE.
-    updated.acknowledged = doneCheck->isChecked() && !updated.recurrence.isRecurring();
-    // Re-arm; if the new time is already past, the next tick fires it again.
-    updated.triggered = false;
-    updated.scheduledUtc = updated.triggerUtc;
-    updated.snoozed = false;
-    updated.missed = false;
-
-    {
-        const int styleData = styleCombo->currentData().toInt();
-        if (styleData < 0)
-            updated.notificationStyle = std::nullopt;
-        else
-            updated.notificationStyle = static_cast<NotificationStyle>(styleData);
-    }
-
-    withUndo(tr("Edit alarm"), [this, updated, id]() {
+    // A new time or state ends a ringing notification; label/style-only
+    // edits leave it (and any pending snooze) alone.
+    const bool reset = outcome.rescheduled || alarmState(updated) != alarmState(before);
+    withUndo(tr("Edit alarm"), [this, updated, id, reset]() {
         m_manager->update(updated);
+        if (!reset)
+            return;
         m_activeTriggered.remove(id);
         if (auto* d = m_dialogs.take(id))
             d->deleteLater();

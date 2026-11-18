@@ -21,6 +21,8 @@ Simple keyboard-friendly system-tray alarm / reminder for Linux.
 | `Recurrence` | Repeat rule (interval / weekly mask + local time); `nextAfter()` |
 | `AlarmManager` | Parse, persist (`$XDG_STATE_HOME/alarmqt/alarms.json`), 1 Hz tick, signals |
 | `MainWindow` | Clock, table, input; tray; edit/restart/clear DONE |
+| `AlarmEdit` | Edit-dialog logic (Core only): `applyAlarmEdit()` reschedules only when the expression changed or a DONE alarm is reopened |
+| `EditAlarmDialog` | Edit alarm: one time expression + live preview + date picker (writes into the expression), label, style, state |
 | `NotificationDialog` | Always-on-top dialog; side blinkers + sound; Ack / Snooze |
 | `AlarmDBus` | Session bus `org.alarmqt.AlarmQt` — secondary CLI talks to primary |
 
@@ -75,8 +77,9 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
 Parser tests live in `tests/test_parser.cpp`, recurrence rules and
-acknowledge/skip behaviour in `tests/test_recurrence.cpp`; extend them when
-touching `AlarmManager::parse` or `Recurrence`.
+acknowledge/skip behaviour in `tests/test_recurrence.cpp`, edit semantics in
+`tests/test_edit.cpp`; extend them when touching `AlarmManager::parse`,
+`Recurrence` or `AlarmEdit`.
 
 When running the GUI for experiments, use a private session bus and state dir
 so you neither touch the user's alarms nor talk to their running instance:

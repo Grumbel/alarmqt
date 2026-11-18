@@ -36,6 +36,8 @@ add_executable(alarmqt
   src/Alarm.cpp
   src/Recurrence.cpp
   src/AlarmManager.cpp
+  src/AlarmEdit.cpp
+  src/EditAlarmDialog.cpp
   src/MainWindow.cpp
   src/AlarmDBus.cpp
   src/NotificationDialog.cpp
@@ -109,4 +111,18 @@ if(ALARMQT_BUILD_TESTS)
   set_tests_properties(recurrence PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
   )
+
+  add_executable(test_edit
+    tests/test_edit.cpp
+    src/Alarm.cpp
+    src/Recurrence.cpp
+    src/AlarmManager.cpp
+    src/AlarmEdit.cpp
+  )
+  target_include_directories(test_edit PRIVATE src)
+  target_link_libraries(test_edit PRIVATE
+    Qt6::Core
+    Qt6::Test
+  )
+  add_test(NAME edit COMMAND test_edit)
 endif()

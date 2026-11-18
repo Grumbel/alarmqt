@@ -3,7 +3,7 @@
 ## Tip / base
 
 - **Work-line base:** `071e920` (Initial checkin)
-- **Current tip:** Desktop notifications via org.freedesktop.Notifications with app logo
+- **Current tip:** Edit alarm dialog overhaul (single time expression + live preview)
 - **Next bundle NNN:** 050
 
 ## Status
@@ -17,6 +17,16 @@ v0.1 feature set is usable. Parser unit tests live under `tests/` (`ctest` / `ni
 
 ## Done recently
 
+- Edit alarm dialog overhaul: the Command / When / "Apply command → When"
+  trio is replaced by one **Time** expression (main-input syntax) with a live
+  preview (local time, countdown, repeat rule, overdue warning; OK disabled on
+  parse errors) and a calendar picker that writes `yyyy-MM-dd HH:mm` into the
+  expression. Trailing note / leading modifiers move into Label / Notification /
+  State. **State** combo (Active / Disabled / Done) replaces the Done checkbox.
+  Untouched expression keeps the schedule (incl. snooze, ringing dialog);
+  reopening a DONE alarm re-evaluates like Restart; explicit past dates are no
+  longer silently rolled forward by days. Logic in `AlarmEdit`, tests in
+  `tests/test_edit.cpp`
 - Desktop notifications go straight to `org.freedesktop.Notifications`
   (`app_icon=alarmqt`, `image-data` fallback when the icon is not installed,
   `desktop-entry` hint) so the AlarmQt logo shows instead of the warning symbol;
