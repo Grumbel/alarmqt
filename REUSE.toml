@@ -18,6 +18,7 @@ path = [
   "TODO.md",
   "screenshot.png",
   ".gitignore",
+  "PROJECT",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
